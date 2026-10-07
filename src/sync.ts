@@ -1,0 +1,217 @@
+// Upload/download between the phone and the database (spec section 10).
+// The phone saves first and is always usable; this catches the database up whenever there is signal.
+import { createClient, Session } from '@supabase/supabase-js';
+import { get, set } from 'idb-keyval';
+import { useSyncExternalStore } from 'react';
+import { AppState, getState, loadProgram, subscribe, update } from './store';
+
+// Public values: safe to ship. Row-level security in the database is what protects the data.
+const SUPABASE_URL = 'https://cycpaeykmufxxkhmrvdf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_4Kf4zEgOLILz11Vyyg7GYg_AaUgtnrs';
+
+/** Development only: open the app with ?local to skip sign-in and the database. */
+export const LOCAL_ONLY = import.meta.env.DEV && new URLSearchParams(location.search).has('local');
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+interface Rec { kind: string; id: string; data: unknown }
+interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null }
+export interface SyncView {
+  auth: 'loading' | 'in' | 'out';
+  pending: number;
+  /** When the oldest waiting item was first queued. */
+  oldest: number | null;
+  error: string | null;
+}
+
+const DISK_KEY = 'training-app-sync-v1';
+const DAY = 24 * 3600 * 1000;
+let disk: SyncDisk = { pushed: {}, since: {}, lastPull: null };
+let session: Session | null = null;
+let view: SyncView = { auth: LOCAL_ONLY ? 'in' : 'loading', pending: 0, oldest: null, error: null };
+const listeners = new Set<() => void>();
+let busy = false;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function setView(patch: Partial<SyncView>) {
+  view = { ...view, ...patch };
+  listeners.forEach(l => l());
+}
+
+export function useSync(): SyncView {
+  return useSyncExternalStore(cb => { listeners.add(cb); return () => listeners.delete(cb); }, () => view);
+}
+
+export const waitingTooLong = (v: SyncView) => v.oldest !== null && Date.now() - v.oldest > DAY;
+
+// cyrb53: small, fast string hash, enough to tell "changed since last upload".
+function hash(str: string): number {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761);
+    h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+const hashOf = (data: unknown) => hash(JSON.stringify(data));
+const keyOf = (r: { kind: string; id: string }) => `${r.kind}/${r.id}`;
+
+/** Everything on the phone that belongs in the database. */
+function localRecords(s: AppState): Map<string, Rec> {
+  const out = new Map<string, Rec>();
+  const add = (kind: string, id: string, data: unknown) => out.set(`${kind}/${id}`, { kind, id, data });
+  for (const x of s.sessions) add('session', x.id, x);
+  for (const x of s.sets) add('set', x.id, x);
+  if (s.program) {
+    add('meta', 'program', s.program);
+    for (const p of s.profiles) add('profile', p.id, p);
+    add('meta', 'schedule', s.schedule);
+    add('meta', 'stints', s.stints);
+    add('meta', 'days', s.days);
+    add('meta', 'restOverrides', s.restOverrides);
+  }
+  return out;
+}
+
+function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
+  const upsert = <T extends { id: string }>(list: T[], row: T) => {
+    const i = list.findIndex(x => x.id === row.id);
+    if (i >= 0) list[i] = row; else list.push(row);
+  };
+  if (r.kind === 'session') {
+    if (r.deleted) s.sessions = s.sessions.filter(x => x.id !== r.id);
+    else upsert(s.sessions, r.data as AppState['sessions'][number]);
+  } else if (r.kind === 'set') {
+    if (r.deleted) s.sets = s.sets.filter(x => x.id !== r.id);
+    else upsert(s.sets, r.data as AppState['sets'][number]);
+  } else if (r.kind === 'profile' && !r.deleted) {
+    upsert(s.profiles, r.data as AppState['profiles'][number]);
+  } else if (r.kind === 'meta' && !r.deleted) {
+    if (r.id === 'program') {
+      const p = r.data as NonNullable<AppState['program']>;
+      if (s.schedule.length) s.program = p; else loadProgram(s, p);
+    } else if (r.id === 'schedule') s.schedule = r.data as AppState['schedule'];
+    else if (r.id === 'stints') s.stints = r.data as AppState['stints'];
+    else if (r.id === 'days') s.days = r.data as AppState['days'];
+    else if (r.id === 'restOverrides') s.restOverrides = r.data as AppState['restOverrides'];
+  }
+}
+
+interface Pending { upserts: Rec[]; deletes: { kind: string; id: string }[] }
+
+function pendingNow(): Pending {
+  const local = localRecords(getState());
+  const upserts = [...local.values()].filter(r => disk.pushed[keyOf(r)] !== hashOf(r.data));
+  const deletes = Object.keys(disk.pushed).filter(k => !local.has(k)).map(k => {
+    const i = k.indexOf('/');
+    return { kind: k.slice(0, i), id: k.slice(i + 1) };
+  });
+  return { upserts, deletes };
+}
+
+function refreshCount(): Pending {
+  const p = pendingNow();
+  const keys = new Set([...p.upserts, ...p.deletes].map(keyOf));
+  const now = Date.now();
+  for (const k of keys) disk.since[k] ??= now;
+  for (const k of Object.keys(disk.since)) if (!keys.has(k)) delete disk.since[k];
+  const times = Object.values(disk.since);
+  setView({ pending: keys.size, oldest: times.length ? Math.min(...times) : null });
+  set(DISK_KEY, disk);
+  return p;
+}
+
+async function pull() {
+  let from = 0;
+  let newest = disk.lastPull;
+  const incoming: (Rec & { deleted: boolean; updated_at: string })[] = [];
+  for (;;) {
+    let q = supabase.from('records').select('kind,id,data,deleted,updated_at').order('updated_at').range(from, from + 999);
+    if (disk.lastPull) q = q.gt('updated_at', disk.lastPull);
+    const { data, error } = await q;
+    if (error) throw error;
+    incoming.push(...data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  if (!incoming.length) return;
+  const local = localRecords(getState());
+  const accepted = incoming.filter(r => {
+    const k = keyOf(r);
+    const mine = local.get(k);
+    // A change made on this phone since its last upload wins; otherwise take the database's copy.
+    const changedHere = mine !== undefined && disk.pushed[k] !== undefined && disk.pushed[k] !== hashOf(mine.data);
+    return !changedHere;
+  });
+  update(s => accepted.forEach(r => applyRemote(s, r)));
+  for (const r of accepted) {
+    if (r.deleted) delete disk.pushed[keyOf(r)]; else disk.pushed[keyOf(r)] = hashOf(r.data);
+  }
+  for (const r of incoming) if (!newest || r.updated_at > newest) newest = r.updated_at;
+  disk.lastPull = newest;
+}
+
+async function push(p: Pending) {
+  const user_id = session!.user.id;
+  const stamp = new Date().toISOString();
+  const rows = [
+    ...p.upserts.map(r => ({ user_id, kind: r.kind, id: r.id, data: r.data, deleted: false, updated_at: stamp })),
+    ...p.deletes.map(r => ({ user_id, kind: r.kind, id: r.id, data: {}, deleted: true, updated_at: stamp })),
+  ];
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await supabase.from('records').upsert(rows.slice(i, i + 200), { onConflict: 'user_id,kind,id' });
+    if (error) throw error;
+  }
+  for (const r of p.upserts) disk.pushed[keyOf(r)] = hashOf(r.data);
+  for (const r of p.deletes) delete disk.pushed[keyOf(r)];
+}
+
+export async function syncNow() {
+  if (LOCAL_ONLY || busy || !session) { refreshCount(); return; }
+  if (!navigator.onLine) { refreshCount(); return; }
+  busy = true;
+  try {
+    await pull();
+    const p = refreshCount();
+    if (p.upserts.length || p.deletes.length) await push(p);
+    setView({ error: null });
+  } catch (e) {
+    // Never interrupt logging: the items stay queued and the badge keeps counting.
+    setView({ error: e instanceof Error ? e.message : String((e as { message?: string }).message ?? e) });
+  } finally {
+    busy = false;
+    refreshCount();
+  }
+}
+
+function schedule(ms: number) {
+  clearTimeout(timer);
+  timer = setTimeout(syncNow, ms);
+}
+
+export async function initSync() {
+  disk = (await get(DISK_KEY)) ?? disk;
+  subscribe(() => { refreshCount(); schedule(1500); });
+  if (LOCAL_ONLY) return;
+  window.addEventListener('online', () => schedule(200));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') schedule(200); });
+  setInterval(() => { if (view.pending) syncNow(); }, 60000);
+  supabase.auth.onAuthStateChange((_event, s) => {
+    session = s;
+    setView({ auth: s ? 'in' : 'out' });
+    if (s) schedule(0);
+  });
+  const { data } = await supabase.auth.getSession();
+  session = data.session;
+  setView({ auth: session ? 'in' : 'out' });
+  refreshCount();
+  if (session) schedule(0);
+}
+
+export async function signIn(email: string, password: string): Promise<string | null> {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  return error ? error.message : null;
+}

@@ -1,0 +1,9 @@
+node_modules
+dist
+# The program file holds personal training and injury details. It is loaded into the
+# private database, never published with the app's code.
+seed/
+.env*
+
+.claude/
+shots/
