@@ -18,7 +18,7 @@ export function startRun(state: AppState, slot: Slot, practice = false) {
   const run: RunLog = {
     id: uid(), slotIdx: practice ? null : slot.idx, practice: practice || undefined, type, date: slot.date, week: slot.week,
     title: plan.title + (practice ? ' · Practice' : ''), timeTrial: plan.timeTrial || undefined,
-    segs: plan.timeTrial ? [] : plan.sections.flatMap(sec => sec.lines.map(l => ({ section: sec.title, text: l.text, detail: l.detail, work: !!l.work, prescribed: l.speed, actual: l.speed, done: false }))),
+    segs: plan.timeTrial ? [] : plan.sections.flatMap(sec => sec.lines.map(l => ({ section: sec.title, text: l.text, detail: l.detail, work: !!l.work, prescribed: l.speed, actual: l.speed, km: l.km, done: false }))),
     startedAt: Date.now(),
   };
   update(s => { s.runs.push(run); s.activeRunId = run.id; });

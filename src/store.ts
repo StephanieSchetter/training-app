@@ -61,7 +61,7 @@ export interface SetLog {
   ts: number;
 }
 export type RunType = 'easy' | 'intervals' | 'threshold';
-export interface RunSegLog { section: string; text: string; detail?: string; work: boolean; prescribed?: number; actual?: number; done: boolean }
+export interface RunSegLog { section: string; text: string; detail?: string; work: boolean; prescribed?: number; actual?: number; km?: number; done: boolean }
 export interface RunLog {
   id: string; slotIdx: number | null; type: RunType; date: string; week: number; title: string;
   /** A trial run-through: never changes speeds, the schedule or charts. */

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { GymProfile } from './weights';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
+import { matchActivity, matchLaps } from './garmin';
 import { adjustSpeed, mmss, readinessSuggestion, repSeconds, restingHrAlert, timeTrialReset } from './running';
 
 const adelaide: GymProfile = { id: 'adelaide', name: 'Adelaide', dumbbellStep: 2.5, smallestPlate: 1.25, kettlebells: [8, 12, 16, 20, 24], machineSteps: { leg_curl: 5 } };
@@ -105,6 +106,35 @@ describe('schedule', () => {
     expect(on(s, '2026-10-22')).toEqual(['gymB']);
     expect(restingHrAlert([...Array(30).fill(50), 55, 56, 55])).toBe(true);
     expect(restingHrAlert([...Array(30).fill(50), 55, 54, 55])).toBe(false);
+  });
+});
+
+describe('garmin matching', () => {
+  const lap = (sec: number, avgHr = 150) => ({ sec, km: 0, avgHr });
+  const reps = Array(5).fill({ km: 0.8, speed: 13.8 }); // 3:29 each
+
+  it('laps match reps in order, ignoring warm-up, recoveries and cool-down', () => {
+    const laps = [lap(520, 120), lap(209, 160), lap(120), lap(210, 164), lap(120), lap(208, 166), lap(120), lap(209, 168), lap(120), lap(211, 170), lap(300, 130)];
+    expect(matchLaps(laps, reps)?.map(l => l.avgHr)).toEqual([160, 164, 166, 168, 170]);
+  });
+
+  it('too few rep-length laps -> could not match', () => {
+    expect(matchLaps([lap(520), lap(209), lap(120), lap(210)], reps)).toBeNull();
+    expect(matchLaps([lap(1900)], reps)).toBeNull();
+  });
+
+  it('a warm-up as long as a threshold rep is not mistaken for one', () => {
+    const laps = [lap(480, 125), lap(40), lap(478, 158), lap(120), lap(481, 162), lap(300)];
+    expect(matchLaps(laps, [{ km: 1.68, speed: 12.6 }, { km: 1.68, speed: 12.6 }])?.map(l => l.avgHr)).toEqual([158, 162]);
+  });
+
+  it('activity: same date and kind, closest start time', () => {
+    const act = (id: number, type: 'run' | 'strength', startLocal: string) => ({ id, type, startLocal, date: startLocal.slice(0, 10), durationSec: 0, avgHr: null, maxHr: null, laps: [] });
+    const acts = [act(1, 'run', '2026-10-01 06:10:00'), act(2, 'strength', '2026-10-01 15:31:00'), act(3, 'run', '2026-10-01 15:59:00')];
+    const at = (h: number, m: number) => new Date(2026, 9, 1, h, m).getTime();
+    expect(matchActivity(acts, '2026-10-01', 'run', at(16, 5))?.id).toBe(3);
+    expect(matchActivity(acts, '2026-10-01', 'strength', at(9, 0))?.id).toBe(2);
+    expect(matchActivity(acts, '2026-10-02', 'run', at(9, 0))).toBeUndefined();
   });
 });
 

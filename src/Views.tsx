@@ -1,6 +1,7 @@
 // Calendar, the read-only view of any past or upcoming session, and Settings.
 import { useRef, useState } from 'react';
 import { addDays, isGym, Slot } from './engine/schedule';
+import { matchActivity, matchLaps, Rep } from './engine/garmin';
 import { schemeText } from './Gym';
 import { buildPlan } from './plan';
 import { buildRun } from './runplan';
@@ -22,6 +23,37 @@ export function niceDate(d: string, long = false) {
 export function TypeIcon({ type }: { type: string }) {
   const gym = type.startsWith('gym');
   return <span className={'type ' + (gym ? 'gym' : 'run')}><Icon name={gym ? 'bar' : 'run'} size={20} /></span>;
+}
+
+const hms = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+
+/** The watch activity that goes with a logged session, and for interval/threshold runs the heart rate per rep. */
+function GarminCard({ state, date, type, startedAt, reps }: { state: AppState; date: string; type: 'run' | 'strength'; startedAt: number; reps?: Rep[] }) {
+  const act = matchActivity(state.garminActs, date, type, startedAt);
+  const laps = act && reps?.length ? matchLaps(act.laps, reps) : null;
+  return (
+    <>
+      <h2>Garmin</h2>
+      {!act ? <div className="card muted">No watch activity found for this day yet. It shows up after the next Garmin sync.</div> : (
+        <>
+          <div className="stats">
+            <div><div className="overline">Watch time</div><b>{Math.round(act.durationSec / 60)} min</b></div>
+            <div><div className="overline">Average HR</div><b>{act.avgHr != null ? Math.round(act.avgHr) : '—'}</b></div>
+            <div><div className="overline">Max HR</div><b>{act.maxHr != null ? Math.round(act.maxHr) : '—'}</b></div>
+          </div>
+          {reps && reps.length > 0 && (laps
+            ? (
+              <div className="card list">
+                {laps.map((l, i) => (
+                  <div className="line" key={i}><span>Rep {i + 1}</span><span className="tab">{l.avgHr != null ? `${Math.round(l.avgHr)} bpm` : '—'} <span className="muted small">· {hms(l.sec)}</span></span></div>
+                ))}
+              </div>
+            )
+            : <div className="card muted">Couldn't match laps to reps, so only the session average is shown. Pressing lap at the start and end of each rep makes this work.</div>)}
+        </>
+      )}
+    </>
+  );
 }
 
 /** What to open: a planned slot in the schedule, or a logged session with no slot (practice). */
@@ -76,8 +108,8 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
                 </div>
               </>
             )}
-            <h2>Garmin</h2>
-            <div className="card muted">Will match to your watch activity when synced.</div>
+            <GarminCard state={state} date={done.date} type="run" startedAt={done.startedAt}
+              reps={done.type === 'easy' ? undefined : done.segs.filter(s => s.work && s.done && s.km && s.prescribed).map(s => ({ km: s.km!, speed: s.actual ?? s.prescribed! }))} />
           </main>
           {!done.finishedAt && <Dock><button className="btn primary" onClick={() => update(s => { s.activeRunId = done.id; })}>Resume this run</button></Dock>}
         </div>
@@ -165,6 +197,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
           })}
         </div>
         {logged?.notes && <><h2>Note</h2><div className="card">{logged.notes}</div></>}
+        {logged && <GarminCard state={state} date={logged.date} type="strength" startedAt={logged.startedAt} />}
 
         {!logged && (
           <>
