@@ -15,7 +15,8 @@ export const LOCAL_ONLY = import.meta.env.DEV && new URLSearchParams(location.se
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 interface Rec { kind: string; id: string; data: unknown }
-interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null }
+interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
+const READS_VERSION = 2;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -151,7 +152,8 @@ async function pull() {
   for (;;) {
     // The Garmin sign-in token lives in the same table; the app has no use for it and never downloads it.
     let q = supabase.from('records').select('kind,id,data,deleted,updated_at').neq('kind', 'secret').order('updated_at').range(from, from + 999);
-    if (disk.lastPull) q = q.gt('updated_at', disk.lastPull);
+    // Re-read a short overlap each time: a record stamped slightly earlier can land slightly later.
+    if (disk.lastPull) q = q.gt('updated_at', new Date(Date.parse(disk.lastPull) - 5 * 60 * 1000).toISOString());
     const { data, error } = await q;
     if (error) throw error;
     incoming.push(...data);
@@ -216,6 +218,9 @@ function schedule(ms: number) {
 
 export async function initSync() {
   disk = (await get(DISK_KEY)) ?? disk;
+  // When a new version of the app understands more kinds of record (e.g. Garmin data), download
+  // everything once more so nothing an older version skipped stays missing. Raise the number to trigger it.
+  if (disk.reads !== READS_VERSION) { disk.lastPull = null; disk.reads = READS_VERSION; }
   subscribe(() => { refreshCount(); schedule(1500); });
   if (LOCAL_ONLY) return;
   window.addEventListener('online', () => schedule(200));
