@@ -5,7 +5,9 @@ import { Home } from './Home';
 import { RunSession, startRun } from './Run';
 import { today, useStore } from './store';
 import { signIn, syncNow, useSync } from './sync';
-import { Calendar, SessionView, Settings, Tab, TabBar, Target } from './Views';
+import { Settings } from './Settings';
+import { Stretch } from './Stretch';
+import { Calendar, SessionView, Tab, TabBar, Target } from './Views';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -40,6 +42,7 @@ export function App() {
   const sync = useSync();
   const [tab, setTab] = useState<Tab>('home');
   const [open, setOpen] = useState<Target | null>(null);
+  const [stretching, setStretching] = useState(false);
   const t = today();
   const garminDays = Object.keys(state.garminDays).length;
   const ready = sync.auth === 'in' && !!state.program;
@@ -61,6 +64,7 @@ export function App() {
   }
   if (state.activeSessionId && state.sessions.some(s => s.id === state.activeSessionId)) return <GymSession sessionId={state.activeSessionId} />;
   if (state.activeRunId && state.runs.some(r => r.id === state.activeRunId)) return <RunSession runId={state.activeRunId} />;
+  if (stretching) return <Stretch state={state} onBack={() => setStretching(false)} />;
   if (open) {
     return <SessionView state={state} target={open} onBack={() => setOpen(null)}
       onStart={slot => { setOpen(null); startGym(state, slot.type, slot); }}
@@ -69,7 +73,7 @@ export function App() {
 
   return (
     <div className="screen">
-      {tab === 'home' && <Home state={state} sync={sync} onOpen={setOpen} />}
+      {tab === 'home' && <Home state={state} sync={sync} onOpen={setOpen} onStretch={() => setStretching(true)} />}
       {tab === 'calendar' && <Calendar state={state} onOpen={setOpen} />}
       {tab === 'settings' && <Settings state={state} sync={sync} />}
       <TabBar tab={tab} onTab={setTab} />

@@ -7,8 +7,7 @@ import { ReadinessCard } from './Gym';
 import { applyDoubleUp, heavyBeforeIntervals, shiftFrom, travelOptions } from './engine/schedule';
 import { autoSwaps, buildPlan } from './plan';
 import { buildRun, runAdjustFor } from './runplan';
-import { AppState, currentSpeeds, gymForDate, Program, RunType, SessionLog, setProgram, SHIFTS, today, uid, update } from './store';
-import { APP_VERSION, syncNow, SyncView, waitingTooLong } from './sync';
+import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, SHIFTS, today, update } from './store';
 import { AppBar, Dock, Icon, Sheet } from './ui';
 
 export const NAMES: Record<string, string> = {
@@ -397,73 +396,6 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
           </div>
           <button className="btn primary" disabled={!draft.location.trim() || !draft.start || draft.end < draft.start}
             onClick={() => { update(s => { s.stints.push({ location: draft.location.trim(), start: draft.start, end: draft.end, gym: 'fifo' }); }); setSheet(null); }}>Add stint</button>
-        </Sheet>
-      )}
-    </main>
-  );
-}
-
-export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
-  const file = useRef<HTMLInputElement>(null);
-  const [incoming, setIncoming] = useState<Program | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const p = state.program!;
-
-  const read = async (f: File | undefined) => {
-    if (!f) return;
-    try {
-      const data = JSON.parse(await f.text()) as Program;
-      if (!data.sessions || !data.exercises || !data.block || !data.start) throw new Error('missing parts');
-      setIncoming(data);
-      setMessage(null);
-    } catch {
-      setMessage("That file isn't a program file this app can read.");
-    }
-    if (file.current) file.current.value = '';
-  };
-
-  return (
-    <main className="page home">
-      <h1>Settings</h1>
-
-      <h2>Program</h2>
-      <div className="card">
-        <div className="row"><span>Loaded</span><b>Block {p.block}</b></div>
-        <div className="row"><span>Starts</span><b>{niceDate(p.start)}</b></div>
-        <div className="row"><span>Running plan</span><b>{p.running ? 'Loaded' : 'Not loaded'}</b></div>
-        <input ref={file} type="file" accept=".json,application/json" hidden onChange={e => read(e.target.files?.[0])} />
-        <button className="btn" onClick={() => file.current?.click()}>Load a program file</button>
-        {message && <div className="notice">{message}</div>}
-      </div>
-
-      <h2>Upload</h2>
-      <div className="card">
-        <div className="row"><span>Waiting to upload</span><b>{sync.pending === 0 ? 'Nothing. All uploaded' : `${sync.pending} item${sync.pending > 1 ? 's' : ''}`}</b></div>
-        {waitingTooLong(sync) && <div className="notice">Some items have waited more than 24 hours.</div>}
-        {sync.error && <div className="notice">Last attempt failed: {sync.error}</div>}
-        <button className="btn" onClick={() => syncNow()}>Upload now</button>
-      </div>
-
-      <h2>Garmin</h2>
-      <div className="card">
-        <div className="row"><span>Last successful sync</span><b>{state.garminStatus?.lastSync ? new Date(state.garminStatus.lastSync).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'Not yet'}</b></div>
-        <div className="row"><span>Days of data</span><b>{Object.keys(state.garminDays).length}</b></div>
-        <div className="row"><span>Runs and gym sessions</span><b>{state.garminActs.length}</b></div>
-        {state.garminStatus && !state.garminStatus.ok && <div className="notice">The last attempt didn't work. The app keeps working; it will try again tomorrow morning.</div>}
-      </div>
-
-      <p className="lead small">Gym equipment, rest times, body weight and export will appear here as each part is finished.</p>
-      <p className="lead small">App version {APP_VERSION}</p>
-
-      {incoming && (
-        <Sheet title={`Load Block ${incoming.block}?`} onClose={() => setIncoming(null)}>
-          <p className="muted">
-            {incoming.block === p.block
-              ? 'This updates the current block. Your schedule and everything you have logged stay as they are.'
-              : `This starts a new block on ${niceDate(incoming.start)} and builds a fresh schedule. Everything you have logged is kept.`}
-          </p>
-          <button className="btn primary" onClick={() => { update(s => setProgram(s, incoming)); setIncoming(null); setMessage(`Block ${incoming.block} loaded.`); }}>Load it</button>
-          <button className="btn ghost" onClick={() => setIncoming(null)}>Cancel</button>
         </Sheet>
       )}
     </main>

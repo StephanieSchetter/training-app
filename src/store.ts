@@ -124,6 +124,11 @@ export interface GarminActivity {
 export interface GarminStatus { ok: boolean; lastSync?: string; lastAttempt?: string; error?: string | null }
 
 export interface AppState {
+  /** Body weight, typed in weekly. One entry per date. */
+  weights: { date: string; kg: number }[];
+  /** Evening stretch: which of the six were ticked, per date. */
+  stretch: Record<string, number[]>;
+  physio: { id: string; date: string; text: string }[];
   checkins: Checkin[];
   reductions: Reduction[];
   tempSwaps: TempSwap[];
@@ -162,6 +167,7 @@ function fresh(): AppState {
     runs: [], speeds: null, alerts: [], activeRunId: null,
     garminDays: {}, garminActs: [], garminStatus: null,
     checkins: [], reductions: [], tempSwaps: [], notices: [],
+    weights: [], stretch: {}, physio: [],
   };
 }
 

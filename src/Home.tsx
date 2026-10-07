@@ -93,10 +93,15 @@ function CheckinOffers({ state }: { state: AppState }) {
   );
 }
 
-export function Home({ state, sync, onOpen }: { state: AppState; sync: SyncView; onOpen: (t: Target) => void }) {
+export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync: SyncView; onOpen: (t: Target) => void; onStretch: () => void }) {
   const [confirmWipe, setConfirmWipe] = useState(false);
+  const [kg, setKg] = useState('');
   const p = state.program!;
   const t = today();
+  const stretched = (state.stretch[t] ?? []).length;
+  // Body weight is asked for once a week (5.1).
+  const lastWeight = [...state.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const weightDue = !lastWeight || daysBetween(lastWeight.date, t) >= 7;
   const started = t >= p.start;
   const todays = state.schedule.filter(s => s.date === t && !s.skipped).sort((a, b) => a.order - b.order);
   const upcoming = state.schedule.filter(s => s.date > t && !s.done && !s.skipped).slice(0, 7);
@@ -236,6 +241,26 @@ export function Home({ state, sync, onOpen }: { state: AppState; sync: SyncView;
           </div>
         );
       })}
+
+      <button className="card row tapcard" onClick={onStretch}>
+        <span className="type stretch"><Icon name="clock" size={20} /></span>
+        <div className="grow"><b>Evening stretch</b><div className="muted small">{stretched === 0 ? 'Six stretches · about 8 min' : stretched >= p.stretches.length ? 'Done for today' : `${stretched} of ${p.stretches.length} done today`}</div></div>
+        {stretched >= p.stretches.length ? <span className="ok"><Icon name="check" /></span> : <span className="muted"><Icon name="right" /></span>}
+      </button>
+
+      {weightDue && (
+        <div className="card">
+          <div className="overline">Weekly body weight</div>
+          <div className="muted small">{lastWeight ? `Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : 'Nothing entered yet. One number a week is enough to track the trend.'}</div>
+          <div className="row">
+            <input inputMode="decimal" aria-label="Body weight in kg" value={kg} placeholder={lastWeight ? String(lastWeight.kg) : 'kg'} onChange={e => setKg(e.target.value)} />
+            <button className="btn primary fit" disabled={!(Number(kg) > 20 && Number(kg) < 300)} onClick={() => {
+              update(s => { s.weights = [...s.weights.filter(w => w.date !== t), { date: t, kg: Math.round(Number(kg) * 10) / 10 }]; });
+              setKg('');
+            }}>Save</button>
+          </div>
+        </div>
+      )}
 
       {started && (
         <>

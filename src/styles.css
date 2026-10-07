@@ -166,6 +166,15 @@ input:focus, textarea:focus { border-color: var(--accent); }
 
 .stats.four { grid-template-columns: repeat(4, 1fr); } .stats.four > div { padding: 12px 8px; } .stats.four b { font-size: 17px; } .stats.four .overline { font-size: 10px; letter-spacing: .04em; }
 .alert-card { border-color: var(--warn); }
+.type.stretch { background: var(--raised); color: var(--text); }
+.sub-head { margin: 0 -8px; } .sub-head h1 { font-size: 22px; text-align: center; }
+.line.col { flex-direction: column; align-items: stretch; gap: 8px; }
+.mini-step { display: flex; align-items: center; gap: 4px; flex: none; }
+.mini-step button { width: 44px; height: 44px; border-radius: 12px; background: var(--raised); border: 1px solid var(--line); display: grid; place-items: center; }
+.mini-step button:active { filter: brightness(1.3); }
+.mini-step b { min-width: 68px; text-align: center; font-variant-numeric: tabular-nums; }
+select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; width: 100%; min-height: var(--tap); }
+input[type='date'] { min-height: var(--tap); color-scheme: dark; }
 .chip.shift { background: var(--raised); color: var(--muted); }
 .btn.on { background: var(--text); color: var(--bg); border-color: transparent; }
 .btn.on .muted { color: inherit; opacity: .7; }
