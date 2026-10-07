@@ -95,7 +95,26 @@ export function Segmented<T extends string | number>({ options, value, onChange 
   );
 }
 
-export const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+/** A button that asks for a fresh Garmin pull and says plainly what happened. */
+export function SyncNowButton({ request }: { request: () => Promise<'requested' | 'not-set-up' | 'offline' | 'failed'> }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'requested' | 'not-set-up' | 'offline' | 'failed'>('idle');
+  const TEXT = {
+    requested: 'Requested. New Garmin data usually shows up within two minutes.',
+    'not-set-up': "Sync now isn't set up yet. The morning sync still runs by itself.",
+    offline: "You're offline, so the request couldn't be sent.",
+    failed: "That didn't go through. Try again in a minute.",
+  };
+  return (
+    <>
+      <button className="btn" disabled={state === 'busy' || state === 'requested'} onClick={async () => { setState('busy'); setState(await request()); }}>
+        <Icon name="cloud" size={18} /> {state === 'busy' ? 'Asking…' : 'Sync Garmin now'}
+      </button>
+      {state !== 'idle' && state !== 'busy' && <div className="muted small">{TEXT[state]}</div>}
+    </>
+  );
+}
+
+export const clock =(sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
 export function Elapsed({ since }: { since: number }) {
   const [now, setNow] = useState(Date.now());

@@ -18,7 +18,7 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 13;
+export const APP_VERSION = 14;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -265,6 +265,20 @@ export async function initSync() {
   setView({ auth: session ? 'in' : 'out' });
   refreshCount();
   if (session) schedule(0);
+}
+
+/**
+ * "Sync now" (spec 9): asks the database to start the same Garmin job the morning schedule runs.
+ * The database holds the GitHub key; the app never sees it. New data arrives a minute or two later.
+ */
+export async function requestGarminSync(): Promise<'requested' | 'not-set-up' | 'offline' | 'failed'> {
+  if (LOCAL_ONLY || !navigator.onLine) return 'offline';
+  const { data, error } = await supabase.rpc('request_garmin_sync');
+  if (error) return /function .* does not exist|PGRST202/i.test(`${error.code} ${error.message}`) ? 'not-set-up' : 'failed';
+  if (data !== 'requested') return 'not-set-up';
+  // The job takes about a minute; look for its results a few times afterwards.
+  for (const s of [60, 100, 150]) setTimeout(syncNow, s * 1000);
+  return 'requested';
 }
 
 export async function signIn(email: string, password: string): Promise<string | null> {

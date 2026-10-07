@@ -2,8 +2,8 @@
 import { ReactNode, useRef, useState } from 'react';
 import { exportAll } from './export';
 import { AppState, Program, setProgram, today, uid, update } from './store';
-import { APP_VERSION, syncNow, SyncView, waitingTooLong } from './sync';
-import { clock, Icon, Sheet } from './ui';
+import { APP_VERSION, requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
+import { clock, Icon, Sheet, SyncNowButton } from './ui';
 import { niceDate } from './Views';
 
 type Page = 'main' | 'gyms' | 'rest' | 'swaps' | 'weight' | 'physio';
@@ -267,6 +267,7 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
         <div className="row"><span>Runs and gym sessions</span><b>{state.garminActs.length}</b></div>
         {state.garminStatus && !state.garminStatus.ok && <div className="notice">The last attempt didn't work. The app keeps working; it will try again tomorrow morning.</div>}
         <div className="muted small">Syncs by itself at about 08:00 Adelaide time each day.</div>
+        <SyncNowButton request={requestGarminSync} />
       </div>
 
       <h2>Upload</h2>

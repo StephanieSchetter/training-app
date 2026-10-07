@@ -7,8 +7,8 @@ import { startPracticeRun } from './Run';
 import { buildRun } from './runplan';
 import { trendTiles } from './stats';
 import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
-import { syncNow, SyncView, waitingTooLong } from './sync';
-import { Icon, Segmented, Sheet } from './ui';
+import { requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
+import { Icon, Segmented, Sheet, SyncNowButton } from './ui';
 import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from './Views';
 
 const PRACTICE_FOR_TESTS = import.meta.env.DEV && new URLSearchParams(location.search).has('practice');
@@ -153,8 +153,11 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
         </div>
       )}
       {garminStale && (
-        <div className="card warn-card"><Icon name="info" />
-          <div>Garmin data is out of date. Last synced {state.garminStatus?.lastSync ? niceDate(state.garminStatus.lastSync.slice(0, 10)) : 'never'}. Everything else works as normal.</div>
+        <div className="card">
+          <div className="row warn-text"><Icon name="info" />
+            <div className="grow">Garmin data is out of date. Last synced {state.garminStatus?.lastSync ? niceDate(state.garminStatus.lastSync.slice(0, 10)) : 'never'}. Everything else works as normal.</div>
+          </div>
+          <SyncNowButton request={requestGarminSync} />
         </div>
       )}
       {garminDay && (
