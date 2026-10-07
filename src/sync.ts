@@ -96,6 +96,12 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
   } else if (r.kind === 'alert') {
     if (r.deleted) s.alerts = s.alerts.filter(x => x.id !== r.id);
     else upsert(s.alerts, r.data as AppState['alerts'][number]);
+  } else if (r.kind === 'garmin_day' && !r.deleted) {
+    s.garminDays[r.id] = r.data as AppState['garminDays'][string];
+  } else if (r.kind === 'garmin_activity' && !r.deleted) {
+    upsert(s.garminActs as unknown as { id: string }[], r.data as { id: string });
+  } else if (r.kind === 'meta' && r.id === 'garmin_status' && !r.deleted) {
+    s.garminStatus = r.data as AppState['garminStatus'];
   } else if (r.kind === 'profile' && !r.deleted) {
     upsert(s.profiles, r.data as AppState['profiles'][number]);
   } else if (r.kind === 'meta' && !r.deleted) {
@@ -109,6 +115,10 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
     else if (r.id === 'speeds') s.speeds = r.data as AppState['speeds'];
   }
 }
+
+/** Records this phone writes. Everything else (Garmin data) is written by the daily pull and only read here. */
+const ownedByPhone = (r: { kind: string; id: string }) =>
+  ['session', 'set', 'run', 'alert', 'profile'].includes(r.kind) || (r.kind === 'meta' && r.id !== 'garmin_status');
 
 interface Pending { upserts: Rec[]; deletes: { kind: string; id: string }[] }
 
@@ -139,7 +149,8 @@ async function pull() {
   let newest = disk.lastPull;
   const incoming: (Rec & { deleted: boolean; updated_at: string })[] = [];
   for (;;) {
-    let q = supabase.from('records').select('kind,id,data,deleted,updated_at').order('updated_at').range(from, from + 999);
+    // The Garmin sign-in token lives in the same table; the app has no use for it and never downloads it.
+    let q = supabase.from('records').select('kind,id,data,deleted,updated_at').neq('kind', 'secret').order('updated_at').range(from, from + 999);
     if (disk.lastPull) q = q.gt('updated_at', disk.lastPull);
     const { data, error } = await q;
     if (error) throw error;
@@ -158,6 +169,7 @@ async function pull() {
   });
   update(s => accepted.forEach(r => applyRemote(s, r)));
   for (const r of accepted) {
+    if (!ownedByPhone(r)) continue;
     if (r.deleted) delete disk.pushed[keyOf(r)]; else disk.pushed[keyOf(r)] = hashOf(r.data);
   }
   for (const r of incoming) if (!newest || r.updated_at > newest) newest = r.updated_at;

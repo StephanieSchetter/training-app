@@ -82,7 +82,19 @@ export function currentSpeeds(s: AppState): Speeds {
   return s.speeds ?? { intervals: p.intervals, threshold: p.threshold, strides: p.strides };
 }
 
+export interface GarminDay { date: string; restingHr: number | null; hrv: number | null; sleepHours: number | null; sleepScore: number | null; readiness: number | null; trainingLoad: number | null }
+export interface GarminActivity {
+  id: number; type: 'run' | 'strength'; startLocal: string; date: string; durationSec: number;
+  avgHr: number | null; maxHr: number | null; trainingLoad: number | null; distanceKm: number;
+  laps: { sec: number; km: number; avgHr: number | null }[];
+}
+export interface GarminStatus { ok: boolean; lastSync?: string; lastAttempt?: string; error?: string | null }
+
 export interface AppState {
+  /** Read-only copies of what the daily Garmin pull wrote to the database. */
+  garminDays: Record<string, GarminDay>;
+  garminActs: GarminActivity[];
+  garminStatus: GarminStatus | null;
   runs: RunLog[];
   speeds: Speeds | null;
   alerts: Alert[];
@@ -111,6 +123,7 @@ function fresh(): AppState {
     ],
     stints: [], days: {}, schedule: [], sessions: [], sets: [], restOverrides: {}, activeSessionId: null,
     runs: [], speeds: null, alerts: [], activeRunId: null,
+    garminDays: {}, garminActs: [], garminStatus: null,
   };
 }
 

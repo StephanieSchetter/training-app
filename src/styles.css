@@ -164,6 +164,7 @@ input:focus, textarea:focus { border-color: var(--accent); }
 .plan-ex:last-child { margin-bottom: 0; }
 .setrow.planrow.cur { font-weight: 400; } .setrow.planrow.cur .plan-ex > span:first-child { font-weight: 700; }
 
+.stats.four { grid-template-columns: repeat(4, 1fr); } .stats.four > div { padding: 12px 8px; } .stats.four b { font-size: 17px; } .stats.four .overline { font-size: 10px; letter-spacing: .04em; }
 .alert-card { border-color: var(--warn); }
 .btn.primary.fit-h { min-height: var(--tap); font-size: 16px; }
 .targ.run-now { font-size: 26px; }

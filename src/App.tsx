@@ -99,6 +99,10 @@ export function App() {
   const practiceCount = state.sessions.filter(s => s.practice).length + state.runs.filter(r => r.practice).length;
   const inProgress = state.sessions.filter(s => !s.finishedAt);
   const runsOpen = state.runs.filter(r => !r.finishedAt);
+  // Garmin: today's numbers if the watch has synced, and a banner once the last good pull is over a day old.
+  const garminDay = state.garminDays[t];
+  const lastGarmin = state.garminStatus?.lastSync ? Date.parse(state.garminStatus.lastSync) : null;
+  const garminStale = state.garminStatus !== null && (lastGarmin === null || Date.now() - lastGarmin > 24 * 3600 * 1000);
   const alerts = state.alerts.filter(a => a.status === 'open');
   const answerAlert = (id: string, accept: boolean) => update(s => {
     const a = s.alerts.find(x => x.id === id)!;
@@ -129,6 +133,21 @@ export function App() {
             <div className="card warn-card">
               <Icon name="cloud" />
               <div>Some items have been waiting more than 24 hours to upload. They are safe on this phone. Check your signal, then tap the upload badge to retry.</div>
+            </div>
+          )}
+
+          {garminStale && (
+            <div className="card warn-card">
+              <Icon name="info" />
+              <div>Garmin data is out of date. Last synced {state.garminStatus?.lastSync ? niceDate(state.garminStatus.lastSync.slice(0, 10)) : 'never'}. Everything else works as normal.</div>
+            </div>
+          )}
+          {garminDay && (
+            <div className="stats four">
+              <div><div className="overline">Readiness</div><b>{garminDay.readiness ?? '—'}</b></div>
+              <div><div className="overline">Sleep</div><b>{garminDay.sleepHours != null ? `${garminDay.sleepHours.toFixed(1)} h` : '—'}</b></div>
+              <div><div className="overline">Resting HR</div><b>{garminDay.restingHr ?? '—'}</b></div>
+              <div><div className="overline">HRV</div><b>{garminDay.hrv != null ? Math.round(garminDay.hrv) : '—'}</b></div>
             </div>
           )}
 

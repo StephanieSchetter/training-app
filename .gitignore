@@ -7,3 +7,6 @@ seed/
 
 .claude/
 shots/
+
+.venv/
+__pycache__/
