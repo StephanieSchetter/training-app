@@ -60,7 +60,31 @@ export interface SetLog {
   suggestedWeight: number | null; suggestedReps: number | null;
   ts: number;
 }
+export type RunType = 'easy' | 'intervals' | 'threshold';
+export interface RunSegLog { section: string; text: string; detail?: string; work: boolean; prescribed?: number; actual?: number; done: boolean }
+export interface RunLog {
+  id: string; slotIdx: number; type: RunType; date: string; week: number; title: string;
+  segs: RunSegLog[];
+  /** "Could you have done 2 more reps at this speed?" */
+  answer?: 'yes' | 'no' | 'dnf';
+  timeTrial?: boolean; timeTrialSec?: number;
+  speedBefore?: number; speedAfter?: number;
+  startedAt: number; finishedAt?: number;
+}
+export interface Speeds { intervals: number; threshold: number; strides: number }
+export interface Alert { id: string; kind: 'intervals-slipping'; date: string; status: 'open' | 'accepted' | 'ignored' }
+
+/** Current run speeds: the block's starting speeds until a run answer or time trial changes them. */
+export function currentSpeeds(s: AppState): Speeds {
+  const p = s.program!.running!.speeds;
+  return s.speeds ?? { intervals: p.intervals, threshold: p.threshold, strides: p.strides };
+}
+
 export interface AppState {
+  runs: RunLog[];
+  speeds: Speeds | null;
+  alerts: Alert[];
+  activeRunId: string | null;
   program: Program | null;
   profiles: GymProfile[];
   stints: Stint[];
@@ -84,6 +108,7 @@ function fresh(): AppState {
       { id: 'fifo', name: 'FIFO', dumbbellStep: 2, smallestPlate: null, kettlebells: [], machineSteps: {} },
     ],
     stints: [], days: {}, schedule: [], sessions: [], sets: [], restOverrides: {}, activeSessionId: null,
+    runs: [], speeds: null, alerts: [], activeRunId: null,
   };
 }
 
@@ -114,7 +139,8 @@ export function loadProgram(s: AppState, p: Program) {
 }
 
 export async function initStore() {
-  state = (await get(KEY)) ?? fresh();
+  // Spread over a fresh state so data saved by an older version of the app gains any new fields.
+  state = { ...fresh(), ...((await get(KEY)) ?? {}) };
   if (state.program) tidyProgram(state.program);
   if (!state.program && import.meta.env.DEV && new URLSearchParams(location.search).has('local')) {
     // Development only: the program file is not shipped with the app's code.
@@ -151,6 +177,9 @@ export function useStore(): AppState {
 export const uid = () => crypto.randomUUID();
 
 export function today(): string {
+  // Development only: ?local&today=2026-10-14 pretends it is another day, for testing date-driven screens.
+  const fake = import.meta.env.DEV ? new URLSearchParams(location.search).get('today') : null;
+  if (fake) return fake;
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

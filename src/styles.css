@@ -56,7 +56,7 @@ button:disabled { opacity: .4; cursor: default; }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); font-weight: 500; }
 .btn.danger { color: var(--danger); }
 .btn.slim { min-height: 48px; }
-.btn.option { flex-direction: column; align-items: flex-start; gap: 2px; }
+.btn.option { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; background: transparent; border: 0; color: var(--text); }
 .icon-btn:active:not(:disabled) { background: var(--raised); }
 .link { background: transparent; border: 0; color: var(--accent); font-weight: 600; min-height: 44px; padding: 0 8px; }
@@ -163,6 +163,10 @@ input:focus, textarea:focus { border-color: var(--accent); }
 .plan-ex { display: flex; flex-direction: column; margin-bottom: 4px; }
 .plan-ex:last-child { margin-bottom: 0; }
 .setrow.planrow.cur { font-weight: 400; } .setrow.planrow.cur .plan-ex > span:first-child { font-weight: 700; }
+
+.alert-card { border-color: var(--warn); }
+.btn.primary.fit-h { min-height: var(--tap); font-size: 16px; }
+.targ.run-now { font-size: 26px; }
 
 /* Bottom dock: timer above, main action below, always in thumb reach */
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to bottom, transparent, var(--bg) 24px); padding-top: 24px; pointer-events: none; }

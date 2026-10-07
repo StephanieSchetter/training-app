@@ -4,7 +4,7 @@ import { addDays, isGym, Slot } from './engine/schedule';
 import { schemeText } from './Gym';
 import { buildPlan } from './plan';
 import { buildRun } from './runplan';
-import { AppState, gymForDate, Program, SessionLog, setProgram, today, update } from './store';
+import { AppState, currentSpeeds, gymForDate, Program, RunType, SessionLog, setProgram, today, update } from './store';
 import { syncNow, SyncView, waitingTooLong } from './sync';
 import { AppBar, Dock, Icon, Sheet } from './ui';
 
@@ -35,7 +35,7 @@ function virtualSession(state: AppState, slot: Slot): SessionLog {
   return { id: `preview-${slot.idx}`, slotIdx: slot.idx, type: slot.type, date: slot.date, gymId: gym.id, week: slot.week, swaps, warmup: [], startedAt: Date.now() };
 }
 
-export function SessionView({ state, target, onBack, onStart }: { state: AppState; target: Target; onBack: () => void; onStart: (slot: Slot) => void }) {
+export function SessionView({ state, target, onBack, onStart, onStartRun }: { state: AppState; target: Target; onBack: () => void; onStart: (slot: Slot) => void; onStartRun: (slot: Slot) => void }) {
   const program = state.program!;
   const slot = 'slotIdx' in target ? state.schedule.find(s => s.idx === target.slotIdx) : undefined;
   const logged = 'sessionId' in target
@@ -49,7 +49,40 @@ export function SessionView({ state, target, onBack, onStart }: { state: AppStat
   const when = date === t ? 'Today' : date < t ? 'Past session' : 'Upcoming';
 
   if (!isGym(type as Slot['type'])) {
-    const run = buildRun(program, week, type as 'easy' | 'intervals' | 'threshold');
+    const run = program.running ? buildRun(program, week, type as RunType, currentSpeeds(state)) : null;
+    const done = slot ? state.runs.filter(r => r.slotIdx === slot.idx).at(-1) : undefined;
+    const ANSWERS = { yes: 'Yes, could have done 2 more reps', no: 'No, that was the limit', dnf: "Couldn't finish all reps" };
+    if (done) {
+      return (
+        <div className="screen">
+          <AppBar title={done.title} sub={`${niceDate(date, true)} · Week ${week}`} left={back} />
+          <main className="page">
+            <div className="stats">
+              <div><div className="overline">{done.finishedAt ? 'Completed' : 'In progress'}</div><b>{niceDate(date)}</b></div>
+              <div><div className="overline">{done.timeTrial ? '5 km time' : 'Parts done'}</div><b>{done.timeTrial ? (done.timeTrialSec ? `${Math.floor(done.timeTrialSec / 60)}:${String(done.timeTrialSec % 60).padStart(2, '0')}` : '—') : `${done.segs.filter(s => s.done).length} of ${done.segs.length}`}</b></div>
+              <div><div className="overline">Next speed</div><b>{done.speedAfter !== undefined ? `${done.speedAfter} km/h` : '—'}</b></div>
+            </div>
+            {done.answer && <div className="card"><div className="overline">2 more reps?</div>{ANSWERS[done.answer]}{done.speedBefore !== undefined && done.speedAfter !== undefined ? ` Speed ${done.speedBefore} → ${done.speedAfter} km/h.` : ''}</div>}
+            {done.segs.length > 0 && (
+              <>
+                <h2>What you did</h2>
+                <div className="card list">
+                  {done.segs.map((s, i) => (
+                    <div className="line" key={i}>
+                      <div><div className={s.done ? '' : 'muted'}>{s.text}</div>{s.work && s.done && s.actual !== s.prescribed && <div className="muted small">Ran at {s.actual} km/h</div>}</div>
+                      {s.done ? <span className="ok"><Icon name="check" size={18} /></span> : <span className="muted small">Skipped</span>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            <h2>Garmin</h2>
+            <div className="card muted">Will match to your watch activity when synced.</div>
+          </main>
+          {!done.finishedAt && <Dock><button className="btn primary" onClick={() => update(s => { s.activeRunId = done.id; })}>Resume this run</button></Dock>}
+        </div>
+      );
+    }
     return (
       <div className="screen">
         <AppBar title={run?.title ?? NAMES[type]} sub={`${niceDate(date, true)} · Week ${week}`} left={back} />
@@ -59,7 +92,7 @@ export function SessionView({ state, target, onBack, onStart }: { state: AppStat
               <div className="stats">
                 <div><div className="overline">{when}</div><b>{niceDate(date)}</b></div>
                 <div><div className="overline">Distance</div><b>{run.km.toFixed(1)} km</b></div>
-                <div><div className="overline">{run.outdoors ? 'Where' : 'Incline'}</div><b>{run.outdoors ? 'Outdoors' : program.running!.incline}</b></div>
+                <div><div className="overline">{run.timeTrial ? 'Where' : 'Incline'}</div><b>{run.timeTrial ? 'Outdoors' : program.running!.incline}</b></div>
               </div>
               <p className="lead">{run.summary}</p>
               {run.over8 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than 8 km in total.</div>}
@@ -75,11 +108,12 @@ export function SessionView({ state, target, onBack, onStart }: { state: AppStat
                   </div>
                 </div>
               ))}
-              {!run.outdoors && <p className="lead">Press lap on your watch for each rep.</p>}
-              <div className="card muted">Logging for runs is the next part being built.</div>
+              {run.asks && <p className="lead">Press lap on your watch for each rep.</p>}
+              {date > t && run.asks && <p className="lead small">Speeds shown are your current ones. They move up or down after each run's "2 more reps?" answer.</p>}
             </>
           )}
         </main>
+        {run && slot && date === t && !slot.done && <Dock><button className="btn primary" onClick={() => onStartRun(slot)}>{run.timeTrial ? 'Enter my time' : 'Start this run'}</button></Dock>}
       </div>
     );
   }

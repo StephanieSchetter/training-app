@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { GymSession } from './Gym';
 import { isGym, Slot } from './engine/schedule';
 import { buildRun } from './runplan';
-import { AppState, gymForDate, SessionLog, today, uid, update, useStore, write } from './store';
+import { RunSession, startRun } from './Run';
+import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, today, uid, update, useStore, write } from './store';
 import { signIn, syncNow, useSync, waitingTooLong } from './sync';
 import { Icon, Sheet } from './ui';
 import { Calendar, NAMES, niceDate, SessionView, Settings, Tab, TabBar, Target, TypeIcon } from './Views';
@@ -55,7 +56,8 @@ function blurb(state: AppState, s: Slot): string {
     const items = state.program!.sessions[s.type].items;
     return `${items.length} exercises · ${gymForDate(state, s.date).name} gym`;
   }
-  return buildRun(state.program!, s.week, s.type as 'easy' | 'intervals' | 'threshold')?.summary ?? 'Run';
+  if (!state.program!.running) return 'Run';
+  return buildRun(state.program!, s.week, s.type as RunType, currentSpeeds(state))?.summary ?? 'Run';
 }
 
 export function App() {
@@ -78,7 +80,12 @@ export function App() {
     );
   }
   if (state.activeSessionId) return <GymSession sessionId={state.activeSessionId} />;
-  if (open) return <SessionView state={state} target={open} onBack={() => setOpen(null)} onStart={slot => { setOpen(null); startGym(state, slot.type, slot); }} />;
+  if (state.activeRunId && state.runs.some(r => r.id === state.activeRunId)) return <RunSession runId={state.activeRunId} />;
+  if (open) {
+    return <SessionView state={state} target={open} onBack={() => setOpen(null)}
+      onStart={slot => { setOpen(null); startGym(state, slot.type, slot); }}
+      onStartRun={slot => { setOpen(null); startRun(state, slot); }} />;
+  }
 
   const p = state.program;
   const t = today();
@@ -91,6 +98,15 @@ export function App() {
   const stint = state.stints.find(x => t >= x.start && t <= x.end);
   const practice = state.sessions.filter(s => s.practice);
   const inProgress = state.sessions.filter(s => !s.finishedAt);
+  const runsOpen = state.runs.filter(r => !r.finishedAt);
+  const alerts = state.alerts.filter(a => a.status === 'open');
+  const answerAlert = (id: string, accept: boolean) => update(s => {
+    const a = s.alerts.find(x => x.id === id)!;
+    a.status = accept ? 'accepted' : 'ignored';
+    // Pull-back rule 1: drop the next Gym B.
+    const next = accept ? s.schedule.find(x => x.type === 'gymB' && !x.done && !x.skipped && x.date >= t) : undefined;
+    if (next) next.skipped = true;
+  });
 
   return (
     <div className="screen">
@@ -116,9 +132,28 @@ export function App() {
             </div>
           )}
 
-          {inProgress.length > 0 && (
+          {alerts.map(a => (
+            <div className="card alert-card" key={a.id}>
+              <div className="overline">Suggestion</div>
+              <b>Interval speeds have slipped two sessions in a row.</b>
+              <div className="muted">Next week's intervals drop by 0.3 km/h. To help you recover, the suggestion is to skip your next Gym B.</div>
+              <div className="grid2">
+                <button className="btn" onClick={() => answerAlert(a.id, false)}>Ignore</button>
+                <button className="btn primary fit-h" onClick={() => answerAlert(a.id, true)}>Skip Gym B</button>
+              </div>
+            </div>
+          ))}
+
+          {inProgress.length + runsOpen.length > 0 && (
             <>
               <h2>In progress</h2>
+              {runsOpen.map(r => (
+                <div className="card row" key={r.id}>
+                  <TypeIcon type={r.type} />
+                  <div className="grow"><b>{r.title}</b><div className="muted small">{r.segs.filter(x => x.done).length} of {r.segs.length} parts done</div></div>
+                  <button className="btn primary fit" onClick={() => update(st => { st.activeRunId = r.id; })}>Resume</button>
+                </div>
+              ))}
               {inProgress.map(s => (
                 <div className="card row" key={s.id}>
                   <TypeIcon type={s.type} />
@@ -145,6 +180,7 @@ export function App() {
                   {s.done ? <span className="ok"><Icon name="check" /></span> : <span className="muted"><Icon name="right" /></span>}
                 </button>
                 {isGym(s.type) && !s.done && !running && <button className="btn primary" onClick={() => startGym(state, s.type, s)}>Start {NAMES[s.type]}</button>}
+                {!isGym(s.type) && !s.done && p.running && !runsOpen.some(r => r.slotIdx === s.idx) && <button className="btn primary" onClick={() => startRun(state, s)}>Start {NAMES[s.type]}</button>}
               </div>
             );
           })}

@@ -65,6 +65,9 @@ function localRecords(s: AppState): Map<string, Rec> {
   const add = (kind: string, id: string, data: unknown) => out.set(`${kind}/${id}`, { kind, id, data });
   for (const x of s.sessions) add('session', x.id, x);
   for (const x of s.sets) add('set', x.id, x);
+  for (const x of s.runs) add('run', x.id, x);
+  for (const x of s.alerts) add('alert', x.id, x);
+  if (s.speeds) add('meta', 'speeds', s.speeds);
   if (s.program) {
     add('meta', 'program', s.program);
     for (const p of s.profiles) add('profile', p.id, p);
@@ -87,6 +90,12 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
   } else if (r.kind === 'set') {
     if (r.deleted) s.sets = s.sets.filter(x => x.id !== r.id);
     else upsert(s.sets, r.data as AppState['sets'][number]);
+  } else if (r.kind === 'run') {
+    if (r.deleted) s.runs = s.runs.filter(x => x.id !== r.id);
+    else upsert(s.runs, r.data as AppState['runs'][number]);
+  } else if (r.kind === 'alert') {
+    if (r.deleted) s.alerts = s.alerts.filter(x => x.id !== r.id);
+    else upsert(s.alerts, r.data as AppState['alerts'][number]);
   } else if (r.kind === 'profile' && !r.deleted) {
     upsert(s.profiles, r.data as AppState['profiles'][number]);
   } else if (r.kind === 'meta' && !r.deleted) {
@@ -97,6 +106,7 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
     else if (r.id === 'stints') s.stints = r.data as AppState['stints'];
     else if (r.id === 'days') s.days = r.data as AppState['days'];
     else if (r.id === 'restOverrides') s.restOverrides = r.data as AppState['restOverrides'];
+    else if (r.id === 'speeds') s.speeds = r.data as AppState['speeds'];
   }
 }
 

@@ -13,7 +13,7 @@ const sideName = (s?: 'L' | 'R') => (s === 'L' ? 'Left' : s === 'R' ? 'Right' : 
 const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
 export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
 
-function useWakeLock() {
+export function useWakeLock() {
   useEffect(() => {
     let lock: WakeLockSentinel | null = null;
     const ask = () => navigator.wakeLock?.request('screen').then(l => { lock = l; }).catch(() => {});
