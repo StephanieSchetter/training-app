@@ -110,6 +110,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
               ))}
               {run.asks && <p className="lead">Press lap on your watch for each rep.</p>}
               {date > t && run.asks && <p className="lead small">Speeds shown are your current ones. They move up or down after each run's "2 more reps?" answer.</p>}
+              {date > t && <div className="card muted">This is a preview. The Start button appears here on {niceDate(date, true)}.</div>}
             </>
           )}
         </main>
@@ -139,6 +140,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
         </div>
         {!logged && <p className="lead">{program.weekNotes[week]}{program.sessions[type].note ? ` ${program.sessions[type].note}` : ''}</p>}
         {!logged && date > t && <p className="lead small">Weights shown are based on what you've logged so far. They update after each session.</p>}
+        {!logged && date > t && <div className="card muted">This is a preview. The Start button appears here on {niceDate(date, true)}.</div>}
         {logged?.badDay && <div className="card warn-card"><Icon name="flag" /> Flagged as a bad day.</div>}
 
         <h2>{logged ? 'What you did' : 'The plan'}</h2>

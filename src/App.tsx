@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { GymSession } from './Gym';
 import { isGym, Slot } from './engine/schedule';
 import { buildRun } from './runplan';
-import { RunSession, startRun } from './Run';
+import { RunSession, startPracticeRun, startRun } from './Run';
 import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, today, uid, update, useStore, write } from './store';
 import { signIn, syncNow, useSync, waitingTooLong } from './sync';
 import { Icon, Sheet } from './ui';
@@ -96,7 +96,7 @@ export function App() {
   const weekSlots = state.schedule.filter(s => s.week === week);
   const gym = gymForDate(state, t);
   const stint = state.stints.find(x => t >= x.start && t <= x.end);
-  const practice = state.sessions.filter(s => s.practice);
+  const practiceCount = state.sessions.filter(s => s.practice).length + state.runs.filter(r => r.practice).length;
   const inProgress = state.sessions.filter(s => !s.finishedAt);
   const runsOpen = state.runs.filter(r => !r.finishedAt);
   const alerts = state.alerts.filter(a => a.status === 'open');
@@ -215,11 +215,23 @@ export function App() {
             <>
               <h2>Practice run-through</h2>
               <div className="card">
-                <div className="muted small">Try the gym screens before Block {p.block} starts. Practice sets never count towards suggestions or charts.</div>
+                <div className="muted small">Try any session before Block {p.block} starts. Practice never counts towards suggestions, speeds or charts.</div>
+                <div className="overline">Gym</div>
                 <div className="grid2">
                   {['gymB', 'gymC', 'gymA', 'gymD'].map(g => <button className="btn" key={g} onClick={() => startGym(state, g, null)}>{NAMES[g]}</button>)}
                 </div>
-                {practice.length > 0 && <button className="btn ghost" onClick={() => setConfirmWipe(true)}>Delete practice data · {practice.length} session{practice.length > 1 ? 's' : ''}</button>}
+                {p.running && (
+                  <>
+                    <div className="overline">Runs</div>
+                    <div className="grid2">
+                      <button className="btn" onClick={() => startPracticeRun(state, 'easy', 1)}>Easy Run</button>
+                      <button className="btn" onClick={() => startPracticeRun(state, 'intervals', 1)}>Intervals</button>
+                      <button className="btn" onClick={() => startPracticeRun(state, 'threshold', 1)}>Threshold Run</button>
+                      <button className="btn" onClick={() => startPracticeRun(state, 'intervals', 4)}>Time Trial</button>
+                    </div>
+                  </>
+                )}
+                {practiceCount > 0 && <button className="btn ghost" onClick={() => setConfirmWipe(true)}>Delete practice data · {practiceCount} session{practiceCount > 1 ? 's' : ''}</button>}
               </div>
             </>
           )}
@@ -236,6 +248,7 @@ export function App() {
               const ids = new Set(s.sessions.filter(x => x.practice).map(x => x.id));
               s.sessions = s.sessions.filter(x => !ids.has(x.id));
               s.sets = s.sets.filter(x => !ids.has(x.sessionId));
+              s.runs = s.runs.filter(x => !x.practice);
             });
             setConfirmWipe(false);
           }}>Delete practice data</button>

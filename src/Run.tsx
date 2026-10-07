@@ -4,14 +4,20 @@ import { adjustSpeed, mmss, SUB20_SPEED, timeTrialReset } from './engine/running
 import type { Slot } from './engine/schedule';
 import { useWakeLock } from './Gym';
 import { buildRun } from './runplan';
-import { AppState, currentSpeeds, RunLog, RunType, uid, update, useStore } from './store';
+import { AppState, currentSpeeds, RunLog, RunType, today, uid, update, useStore } from './store';
 import { AppBar, Dock, Elapsed, Icon, Sheet, Stepper } from './ui';
 
-export function startRun(state: AppState, slot: Slot) {
+/** Practice: same screens using a given week's plan, with nothing counted. */
+export function startPracticeRun(state: AppState, type: RunType, week: number) {
+  startRun(state, { idx: -1, week, type, date: today(), order: 1 }, true);
+}
+
+export function startRun(state: AppState, slot: Slot, practice = false) {
   const type = slot.type as RunType;
   const plan = buildRun(state.program!, slot.week, type, currentSpeeds(state))!;
   const run: RunLog = {
-    id: uid(), slotIdx: slot.idx, type, date: slot.date, week: slot.week, title: plan.title, timeTrial: plan.timeTrial || undefined,
+    id: uid(), slotIdx: practice ? null : slot.idx, practice: practice || undefined, type, date: slot.date, week: slot.week,
+    title: plan.title + (practice ? ' · Practice' : ''), timeTrial: plan.timeTrial || undefined,
     segs: plan.timeTrial ? [] : plan.sections.flatMap(sec => sec.lines.map(l => ({ section: sec.title, text: l.text, detail: l.detail, work: !!l.work, prescribed: l.speed, actual: l.speed, done: false }))),
     startedAt: Date.now(),
   };
@@ -27,11 +33,11 @@ function finish(id: string, answer?: RunLog['answer']) {
     const slot = s.schedule.find(z => z.idx === r.slotIdx);
     if (slot) slot.done = true;
     s.activeRunId = null;
-    if (!answer || r.type === 'easy') return;
+    if (!answer || r.type === 'easy' || r.practice) return;
     // Weekly rule (7.1): yes -> +0.3; couldn't finish twice running -> -0.3 and, for intervals, the pull-back alert.
     const kind = r.type as 'intervals' | 'threshold';
     const speeds = currentSpeeds(s);
-    const answers = s.runs.filter(x => x.type === kind && x.finishedAt && x.answer).sort((a, b) => a.startedAt - b.startedAt).map(x => x.answer!);
+    const answers = s.runs.filter(x => x.type === kind && x.finishedAt && x.answer && !x.practice).sort((a, b) => a.startedAt - b.startedAt).map(x => x.answer!);
     const next = adjustSpeed(speeds[kind], answers);
     r.speedBefore = speeds[kind];
     r.speedAfter = next.speed;
@@ -128,7 +134,7 @@ export function RunSession({ runId }: { runId: string }) {
           <p className="muted">
             {workDone < workTotal
               ? `You ticked ${workDone} of ${workTotal} reps.`
-              : `This sets next week's speed. You ran at ${speedNow} km/h today.`}
+              : run.practice ? 'Practice only: your answer changes nothing.' : `This sets next week's speed. You ran at ${speedNow} km/h today.`}
           </p>
           {workDone === workTotal && (
             <>
@@ -180,13 +186,15 @@ function TimeTrial({ state, run, closeBtn }: { state: AppState; run: RunLog; clo
         <button className="btn primary" onClick={() => patch(run.id, (r, s) => {
           r.timeTrialSec = total;
           r.finishedAt = Date.now();
+          s.activeRunId = null;
+          if (r.practice) return;
           r.speedBefore = before.intervals;
           r.speedAfter = res.intervals;
           s.speeds = { intervals: res.intervals, threshold: res.threshold, strides: res.strides };
           const slot = s.schedule.find(z => z.idx === r.slotIdx);
           if (slot) slot.done = true;
           s.activeRunId = null;
-        })}>Confirm new speeds</button>
+        })}>{run.practice ? 'Finish practice (nothing changes)' : 'Confirm new speeds'}</button>
       </Dock>
     </div>
   );

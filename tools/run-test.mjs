@@ -42,6 +42,16 @@ async function doIntervals(date, answer, { skipLast = false } = {}) {
   await click(answer);
 }
 
+// Practice run before the block: answering "Yes" must change nothing
+await on('2026-10-07');
+await click('Intervals', 1);
+for (let i = 0; i < 12; i++) await click('Done');
+await click('One question');
+await click('Yes');
+const afterPractice = await text();
+check('Practice intervals can be run before the block', afterPractice.includes('Delete practice data'));
+check('Practice "Yes" does not change speeds', afterPractice.includes('at 13.8 km/h') && !afterPractice.includes('14.1'));
+
 // Week 1: yes -> +0.3
 await doIntervals('2026-10-14', 'Yes');
 await on('2026-10-15');
