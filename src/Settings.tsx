@@ -1,5 +1,6 @@
 // Settings (spec 5.7): gym equipment, rest times, swaps, body weight, physio notes, program, Garmin, upload.
 import { ReactNode, useRef, useState } from 'react';
+import { exportAll } from './export';
 import { AppState, Program, setProgram, today, uid, update } from './store';
 import { APP_VERSION, syncNow, SyncView, waitingTooLong } from './sync';
 import { clock, Icon, Sheet } from './ui';
@@ -43,6 +44,7 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
   const file = useRef<HTMLInputElement>(null);
   const [incoming, setIncoming] = useState<Program | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [message2, setMessage2] = useState<string | null>(null);
   const [kg, setKg] = useState('');
   const [kgDate, setKgDate] = useState(today());
   const [note, setNote] = useState('');
@@ -272,6 +274,13 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
         {waitingTooLong(sync) && <div className="notice">Some items have waited more than 24 hours.</div>}
         {sync.error && <div className="notice">Last attempt failed: {sync.error}</div>}
         <button className="btn" onClick={() => syncNow()}>Upload now</button>
+      </div>
+
+      <h2>Export</h2>
+      <div className="card">
+        <div className="muted small">One Excel file with a sheet for every table: sessions, sets, runs, check-ins, Garmin data, body weight, schedule and settings.</div>
+        <button className="btn" onClick={() => setMessage2(`Saved ${exportAll(state, today())} to your downloads.`)}><Icon name="download" size={18} /> Export all to Excel</button>
+        {message2 && <div className="muted small">{message2}</div>}
       </div>
 
       <p className="lead small">App version {APP_VERSION}</p>

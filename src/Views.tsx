@@ -7,7 +7,7 @@ import { ReadinessCard } from './Gym';
 import { applyDoubleUp, heavyBeforeIntervals, shiftFrom, travelOptions } from './engine/schedule';
 import { autoSwaps, buildPlan } from './plan';
 import { buildRun, runAdjustFor } from './runplan';
-import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, SHIFTS, today, update } from './store';
+import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, SHIFTS, today, update, VIEW_ONLY } from './store';
 import { AppBar, Dock, Icon, Sheet } from './ui';
 
 export const NAMES: Record<string, string> = {
@@ -118,7 +118,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
             <GarminCard state={state} date={done.date} type="run" startedAt={done.startedAt}
               reps={done.type === 'easy' ? undefined : done.segs.filter(s => s.work && s.done && s.km && s.prescribed).map(s => ({ km: s.km!, speed: s.actual ?? s.prescribed! }))} />
           </main>
-          {!done.finishedAt && <Dock><button className="btn primary" onClick={() => update(s => { s.activeRunId = done.id; })}>Resume this run</button></Dock>}
+          {!done.finishedAt && !VIEW_ONLY && <Dock><button className="btn primary" onClick={() => update(s => { s.activeRunId = done.id; })}>Resume this run</button></Dock>}
         </div>
       );
     }
@@ -156,7 +156,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
             </>
           )}
         </main>
-        {run && slot && date === t && !slot.done && <Dock><button className="btn primary" onClick={() => onStartRun(slot, score !== null && runChoice !== null && !run.timeTrial ? { score, accepted: runChoice } : undefined)}>{run.timeTrial ? 'Enter my time' : 'Start this run'}</button></Dock>}
+        {run && slot && date === t && !slot.done && !VIEW_ONLY && <Dock><button className="btn primary" onClick={() => onStartRun(slot, score !== null && runChoice !== null && !run.timeTrial ? { score, accepted: runChoice } : undefined)}>{run.timeTrial ? 'Enter my time' : 'Start this run'}</button></Dock>}
       </div>
     );
   }
@@ -166,8 +166,8 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
   const gym = state.profiles.find(p => p.id === session.gymId)!;
   const sets = logged ? state.sets.filter(s => s.sessionId === logged.id) : [];
   const work = sets.filter(s => !s.rampUp && !s.extra);
-  const canStart = !logged && slot && slot.date === t && !slot.done;
-  const inProgress = logged && !logged.finishedAt;
+  const canStart = !VIEW_ONLY && !logged && slot && slot.date === t && !slot.done;
+  const inProgress = !VIEW_ONLY && logged && !logged.finishedAt;
 
   return (
     <div className="screen">
@@ -402,12 +402,13 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
   );
 }
 
-export type Tab = 'home' | 'calendar' | 'settings';
+export type Tab = 'home' | 'calendar' | 'progress' | 'settings';
 
 export function TabBar({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
   const items: { id: Tab; label: string; icon: string }[] = [
     { id: 'home', label: 'Today', icon: 'home' },
     { id: 'calendar', label: 'Calendar', icon: 'cal' },
+    { id: 'progress', label: 'Progress', icon: 'chart' },
     { id: 'settings', label: 'Settings', icon: 'gear' },
   ];
   return (

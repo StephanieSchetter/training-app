@@ -5,7 +5,8 @@ import { addDays, isGym, shiftFrom, Slot } from './engine/schedule';
 import { startGym } from './Gym';
 import { startPracticeRun } from './Run';
 import { buildRun } from './runplan';
-import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update } from './store';
+import { trendTiles } from './stats';
+import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
 import { syncNow, SyncView, waitingTooLong } from './sync';
 import { Icon, Segmented, Sheet } from './ui';
 import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from './Views';
@@ -93,7 +94,7 @@ function CheckinOffers({ state }: { state: AppState }) {
   );
 }
 
-export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync: SyncView; onOpen: (t: Target) => void; onStretch: () => void }) {
+export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: AppState; sync: SyncView; onOpen: (t: Target) => void; onStretch: () => void; onProgress: () => void }) {
   const [confirmWipe, setConfirmWipe] = useState(false);
   const [kg, setKg] = useState('');
   const p = state.program!;
@@ -164,6 +165,12 @@ export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync
         </div>
       )}
 
+      {VIEW_ONLY && (
+        <div className="card row"><Icon name="info" />
+          <div className="grow">You're on the computer, so this is view only. Log sessions, check-ins and body weight on your phone.</div>
+        </div>
+      )}
+
       {state.notices.map(n => (
         <div className="card row" key={n.id}>
           <div className="grow"><div className="overline">Schedule change</div>{n.text}</div>
@@ -171,8 +178,8 @@ export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync
         </div>
       ))}
 
-      <CheckinCard state={state} t={t} />
-      <CheckinOffers state={state} />
+      {!VIEW_ONLY && <CheckinCard state={state} t={t} />}
+      {!VIEW_ONLY && <CheckinOffers state={state} />}
 
       {alerts.map(a => (
         <div className="card alert-card" key={a.id}>
@@ -198,7 +205,7 @@ export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync
       {travelDays.map(d => <TravelCard key={d} state={state} date={d} />)}
       <HeavyGuardCard state={state} />
 
-      {inProgress.length + runsOpen.length > 0 && (
+      {!VIEW_ONLY && inProgress.length + runsOpen.length > 0 && (
         <>
           <h2>In progress</h2>
           {runsOpen.map(r => (
@@ -236,19 +243,30 @@ export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync
               {s.done ? <span className="ok"><Icon name="check" /></span> : <span className="muted"><Icon name="right" /></span>}
             </button>
             {!s.done && changes && <div className="notice"><Icon name="info" size={16} /> Readiness {garminDay!.readiness}: {sug!.text}. You choose when you start.</div>}
-            {isGym(s.type) && !s.done && !running && <button className="btn primary" onClick={() => startGym(state, s.type, s)}>Start {NAMES[s.type]}</button>}
-            {!isGym(s.type) && !s.done && !running && p.running && <button className="btn primary" onClick={() => onOpen({ slotIdx: s.idx })}>Open {NAMES[s.type]}</button>}
+            {!VIEW_ONLY && isGym(s.type) && !s.done && !running && <button className="btn primary" onClick={() => startGym(state, s.type, s)}>Start {NAMES[s.type]}</button>}
+            {!VIEW_ONLY && !isGym(s.type) && !s.done && !running && p.running && <button className="btn primary" onClick={() => onOpen({ slotIdx: s.idx })}>Open {NAMES[s.type]}</button>}
           </div>
         );
       })}
 
-      <button className="card row tapcard" onClick={onStretch}>
+      <h2>Trends</h2>
+      <div className="tiles">
+        {trendTiles(state, t).map(tile => (
+          <button className="tile" key={tile.label} onClick={onProgress}>
+            <span className="overline">{tile.label}</span>
+            <b>{tile.value}</b>
+            <span className="muted small">{tile.good && <span className="ok">▲ </span>}{tile.change}</span>
+          </button>
+        ))}
+      </div>
+
+      {!VIEW_ONLY && <button className="card row tapcard" onClick={onStretch}>
         <span className="type stretch"><Icon name="clock" size={20} /></span>
         <div className="grow"><b>Evening stretch</b><div className="muted small">{stretched === 0 ? 'Six stretches · about 8 min' : stretched >= p.stretches.length ? 'Done for today' : `${stretched} of ${p.stretches.length} done today`}</div></div>
         {stretched >= p.stretches.length ? <span className="ok"><Icon name="check" /></span> : <span className="muted"><Icon name="right" /></span>}
-      </button>
+      </button>}
 
-      {weightDue && (
+      {weightDue && !VIEW_ONLY && (
         <div className="card">
           <div className="overline">Weekly body weight</div>
           <div className="muted small">{lastWeight ? `Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : 'Nothing entered yet. One number a week is enough to track the trend.'}</div>
@@ -288,7 +306,7 @@ export function Home({ state, sync, onOpen, onStretch }: { state: AppState; sync
         ))}
       </div>
 
-      {!started && (
+      {!started && !VIEW_ONLY && (
         <>
           <h2>Practice run-through</h2>
           <div className="card">

@@ -3,7 +3,8 @@ import { dailyChecks } from './daily';
 import { GymSession, startGym } from './Gym';
 import { Home } from './Home';
 import { RunSession, startRun } from './Run';
-import { today, useStore } from './store';
+import { Progress } from './Progress';
+import { today, useStore, VIEW_ONLY } from './store';
 import { signIn, syncNow, useSync } from './sync';
 import { Settings } from './Settings';
 import { Stretch } from './Stretch';
@@ -62,9 +63,9 @@ export function App() {
       </main></div>
     );
   }
-  if (state.activeSessionId && state.sessions.some(s => s.id === state.activeSessionId)) return <GymSession sessionId={state.activeSessionId} />;
-  if (state.activeRunId && state.runs.some(r => r.id === state.activeRunId)) return <RunSession runId={state.activeRunId} />;
-  if (stretching) return <Stretch state={state} onBack={() => setStretching(false)} />;
+  if (!VIEW_ONLY && state.activeSessionId && state.sessions.some(s => s.id === state.activeSessionId)) return <GymSession sessionId={state.activeSessionId} />;
+  if (!VIEW_ONLY && state.activeRunId && state.runs.some(r => r.id === state.activeRunId)) return <RunSession runId={state.activeRunId} />;
+  if (stretching && !VIEW_ONLY) return <Stretch state={state} onBack={() => setStretching(false)} />;
   if (open) {
     return <SessionView state={state} target={open} onBack={() => setOpen(null)}
       onStart={slot => { setOpen(null); startGym(state, slot.type, slot); }}
@@ -72,9 +73,10 @@ export function App() {
   }
 
   return (
-    <div className="screen">
-      {tab === 'home' && <Home state={state} sync={sync} onOpen={setOpen} onStretch={() => setStretching(true)} />}
+    <div className={'screen' + (VIEW_ONLY && tab === 'progress' ? ' wide' : '')}>
+      {tab === 'home' && <Home state={state} sync={sync} onOpen={setOpen} onStretch={() => setStretching(true)} onProgress={() => setTab('progress')} />}
       {tab === 'calendar' && <Calendar state={state} onOpen={setOpen} />}
+      {tab === 'progress' && <Progress state={state} />}
       {tab === 'settings' && <Settings state={state} sync={sync} />}
       <TabBar tab={tab} onTab={setTab} />
     </div>

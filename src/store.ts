@@ -97,6 +97,12 @@ export interface Notice { id: string; date: string; text: string }
 /** Readiness-based changes to a run, when accepted. */
 export interface RunAdjust { speedDelta?: number; fewerReps?: number; easy30?: boolean }
 
+/**
+ * The phone is the only logging device (spec 0, 5.9). On a computer (mouse, wide window) the app is
+ * for viewing charts and reviewing sessions, so logging controls are hidden there.
+ */
+export const VIEW_ONLY = typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches && window.innerWidth >= 900;
+
 export const SHIFTS: { id: string; label: string; hours: string; short: string }[] = [
   { id: 'early', label: 'Early', hours: '07:30–17:30', short: 'E' },
   { id: 'mid', label: 'Mid', hours: '08:30–18:30', short: 'M' },
