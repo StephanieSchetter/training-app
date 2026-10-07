@@ -33,8 +33,14 @@ jobs:
           BACKUP_DEPLOY_KEY: ${{ secrets.BACKUP_DEPLOY_KEY }}
         run: |
           mkdir -p ~/.ssh
-          # The key was pasted from Windows, so strip its carriage returns or ssh cannot read it.
-          printf '%s\n' "$BACKUP_DEPLOY_KEY" | tr -d '\r' > ~/.ssh/backup_key
+          # The key is stored as one line of base64 so that pasting it cannot damage its line breaks.
+          # (A key pasted in its original multi-line form is still accepted.)
+          case "$BACKUP_DEPLOY_KEY" in
+            -----BEGIN*) printf '%s\n' "$BACKUP_DEPLOY_KEY" | tr -d '\r' > ~/.ssh/backup_key ;;
+            *) printf '%s' "$BACKUP_DEPLOY_KEY" | tr -d ' \r\n' | base64 -d > ~/.ssh/backup_key ;;
+          esac
+          echo "Key file: $(wc -l < ~/.ssh/backup_key) lines, $(wc -c < ~/.ssh/backup_key) bytes"
+          ssh-keygen -y -f ~/.ssh/backup_key > /dev/null && echo "Key reads correctly"
           chmod 600 ~/.ssh/backup_key
           ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/backup_key -o IdentitiesOnly=yes"
