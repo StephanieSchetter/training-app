@@ -126,6 +126,44 @@ button:disabled { opacity: .4; cursor: default; }
 input, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; width: 100%; outline: 0; }
 input:focus, textarea:focus { border-color: var(--accent); }
 
+/* Tab bar, calendar and tappable rows */
+.page.home { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); }
+.tabbar-in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); padding-bottom: env(safe-area-inset-bottom); }
+.tabbar button { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 60px; justify-content: center; background: transparent; border: 0; color: var(--muted); font-size: 12px; font-weight: 600; }
+.tabbar button.on { color: var(--accent); }
+.tapcard { width: 100%; text-align: left; color: inherit; font: inherit; }
+.tapcard:active, .tapline:active { filter: brightness(1.25); }
+.tapcard.bare { background: transparent; border: 0; padding: 0; }
+.tapline { width: 100%; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); color: inherit; }
+.weekstrip > button { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 8px 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 12px; min-height: 52px; }
+.weekstrip > button.done { background: var(--accent-soft); border-color: transparent; } .weekstrip > button.done b { color: var(--accent); }
+.weekstrip > button.today { border-color: var(--text); }
+.stack { display: flex; flex-direction: column; gap: var(--gap); }
+.warn-text { color: var(--warn); }
+.tab { font-variant-numeric: tabular-nums; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-head { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px 0; }
+.cal-day { min-height: 64px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0 4px; border-radius: 12px; background: var(--surface); border: 1px solid transparent; color: var(--text); }
+.cal-day.out { opacity: .35; }
+.cal-day.fifo { background: var(--warn-soft); }
+.cal-day.today .cal-num { background: var(--text); color: var(--bg); border-radius: 999px; padding: 0 7px; }
+.cal-day.picked { border-color: var(--accent); }
+.cal-num { font-size: 14px; font-weight: 600; line-height: 22px; }
+.chip { font-size: 10px; font-weight: 700; font-style: normal; line-height: 1; padding: 3px 5px; border-radius: 5px; }
+.chip.gym { background: var(--accent-soft); color: var(--accent); } .chip.run { background: var(--rest-soft); color: var(--rest); }
+.chip.done { background: var(--accent); color: var(--accent-ink); }
+.chip.practice { background: var(--raised); color: var(--muted); } .chip.travel { background: transparent; color: var(--warn); padding: 0; font-size: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; } .sw.fifo { background: var(--warn-soft); border: 1px solid var(--warn); }
+.pill { font: inherit; font-size: 13px; cursor: pointer; }
+.planrow { align-items: flex-start; min-height: 56px; }
+.planrow .circle { margin-top: 2px; }
+.plan-ex { display: flex; flex-direction: column; margin-bottom: 4px; }
+.plan-ex:last-child { margin-bottom: 0; }
+.setrow.planrow.cur { font-weight: 400; } .setrow.planrow.cur .plan-ex > span:first-child { font-weight: 700; }
+
 /* Bottom dock: timer above, main action below, always in thumb reach */
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: linear-gradient(to bottom, transparent, var(--bg) 24px); padding-top: 24px; pointer-events: none; }
 .dock-in { max-width: 560px; margin: 0 auto; padding: 0 16px calc(12px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; pointer-events: auto; }

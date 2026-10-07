@@ -3,7 +3,7 @@
 import { createClient, Session } from '@supabase/supabase-js';
 import { get, set } from 'idb-keyval';
 import { useSyncExternalStore } from 'react';
-import { AppState, getState, loadProgram, subscribe, update } from './store';
+import { AppState, getState, setProgram, subscribe, update } from './store';
 
 // Public values: safe to ship. Row-level security in the database is what protects the data.
 const SUPABASE_URL = 'https://cycpaeykmufxxkhmrvdf.supabase.co';
@@ -92,7 +92,7 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
   } else if (r.kind === 'meta' && !r.deleted) {
     if (r.id === 'program') {
       const p = r.data as NonNullable<AppState['program']>;
-      if (s.schedule.length) s.program = p; else loadProgram(s, p);
+      setProgram(s, p);
     } else if (r.id === 'schedule') s.schedule = r.data as AppState['schedule'];
     else if (r.id === 'stints') s.stints = r.data as AppState['stints'];
     else if (r.id === 'days') s.days = r.data as AppState['days'];

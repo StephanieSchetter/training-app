@@ -27,8 +27,17 @@ const click = async (text, nth = 0) => {
 };
 const top = () => page.evaluate(() => window.scrollTo(0, 0));
 
+const day = async num => {
+  await page.evaluate(num => [...document.querySelectorAll('.cal-day:not(.out)')].find(b => b.querySelector('.cal-num').textContent === String(num)).click(), num);
+  await new Promise(r => setTimeout(r, 150));
+};
 await shot('home');
-await click('Gym B'); await shot('start');
+await click('Calendar'); await day(14); await shot('calendar');
+await click('Intervals'); await shot('run-preview'); await click('Back');
+await day(15); await click('Gym C'); await shot('gym-preview'); await click('Back');
+await click('Settings'); await shot('settings');
+await click('Today');
+await click('Gym B', 1); await shot('start');
 await click('Start warm-up'); await click('Cat-cow'); await click('Thoracic'); await shot('warmup');
 await click('Start lifting'); await shot('first-set');
 for (let i = 0; i < 8; i++) await click('More Weight');
@@ -37,7 +46,7 @@ for (let i = 0; i < 2; i++) await click('More Weight');
 await click('2', 0); await shot('ready-to-log');
 await click('Done'); await shot('resting');
 await click('Done'); await click('Done'); await click('Skip'); await shot('exercise-done');
-await page.evaluate(() => window.scrollTo(0, 9999)); await shot('exercise-done-lower');
+await page.evaluate(() => window.scrollTo(0, 9999)); await shot('full-plan');
 await top(); await click('Next exercise'); await shot('machine-question');
 await click('5'); await click('Next exercise'); await shot('each-side');
 await click('Swap'); await shot('swap-sheet'); await click('Cancel');

@@ -16,7 +16,10 @@ const PATHS: Record<string, string> = {
   run: 'M13 5a1.5 1.5 0 100-.01M9 20l2-5-2-3 3-4 3 3h3M7 12l2-3',
   cloud: 'M7 18a4 4 0 010-8 5 5 0 019.6-1A4.5 4.5 0 0117 18z',
   info: 'M12 11v6M12 7.5v.01M12 3a9 9 0 100 18 9 9 0 000-18z',
-  trash: 'M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13',
+  home: 'M4 11l8-7 8 7v9h-5v-6H9v6H4z',
+  cal: 'M5 6h14v14H5zM5 10h14M9 3v4M15 3v4',
+  gear: 'M12 9a3 3 0 100 6 3 3 0 000-6zM12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1',
+  trash:'M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13',
 };
 
 export function Icon({ name, size = 22 }: { name: keyof typeof PATHS | string; size?: number }) {

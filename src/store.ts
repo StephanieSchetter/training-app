@@ -29,6 +29,17 @@ export interface Program {
   swaps: { when: string; from: string; to: string; label: string }[];
   legRaiseLevels: { level: number; name: string; sets: number; range: [number, number] }[];
   stints: Stint[]; days: Record<string, string>; doubleUps: string[];
+  running?: RunningPlan;
+}
+export interface RunWeek {
+  easy: { min: number; speed: number; strides?: boolean };
+  intervals: { reps: number; km: number; recMin: number; note?: string } | { timeTrial: true };
+  threshold: { reps: number; min: number; recMin?: number } | { easyKm: number; speed: number; strides?: boolean };
+}
+export interface RunningPlan {
+  incline: string;
+  speeds: { intervals: number; threshold: number; recovery: number; thresholdRecovery: number; strides: number; strideRecovery: number; cooldown: number };
+  weeks: Record<string, RunWeek>;
 }
 export interface Stint { location: string; start: string; end: string; gym: string }
 
@@ -76,8 +87,25 @@ function fresh(): AppState {
   };
 }
 
+/** "Seated dumbbell shoulder press" -> "Seated Dumbbell Shoulder Press". */
+export function titleCase(text: string): string {
+  return text.replace(/(^|[\s\-(/])([a-z])/g, (_m, lead: string, ch: string) => lead + ch.toUpperCase());
+}
+
+/** Exercise names are always shown with capital first letters. */
+export function tidyProgram(p: Program): Program {
+  for (const ex of Object.values(p.exercises)) ex.name = titleCase(ex.name);
+  return p;
+}
+
+/** Swap in a new or corrected program file. The schedule is only built the first time. */
+export function setProgram(s: AppState, p: Program) {
+  if (s.schedule.length && s.program?.block === p.block) s.program = tidyProgram(p);
+  else loadProgram(s, p);
+}
+
 export function loadProgram(s: AppState, p: Program) {
-  s.program = p;
+  s.program = tidyProgram(p);
   s.stints = p.stints;
   s.days = { ...p.days };
   let sched = buildSchedule(p.start, p.weeks);
@@ -87,6 +115,7 @@ export function loadProgram(s: AppState, p: Program) {
 
 export async function initStore() {
   state = (await get(KEY)) ?? fresh();
+  if (state.program) tidyProgram(state.program);
   if (!state.program && import.meta.env.DEV && new URLSearchParams(location.search).has('local')) {
     // Development only: the program file is not shipped with the app's code.
     const local = Object.values(import.meta.glob('../seed/*.json', { eager: true }))[0] as { default: Program } | undefined;

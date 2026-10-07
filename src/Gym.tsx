@@ -11,7 +11,7 @@ const RIRS = ['0', '1', '2', '3', '4+'];
 const fmtKg = (w: number | null) => (w === null ? '—' : `${w} kg`);
 const sideName = (s?: 'L' | 'R') => (s === 'L' ? 'Left' : s === 'R' ? 'Right' : '');
 const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
-const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
+export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
 
 function useWakeLock() {
   useEffect(() => {
@@ -25,18 +25,8 @@ function useWakeLock() {
 }
 
 function buzz() {
+  // Vibration only: Brad asked for no sound in the gym.
   navigator.vibrate?.([400, 150, 400, 150, 400]);
-  try {
-    const ctx = new AudioContext();
-    [0, 0.35, 0.7].forEach(t => {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.frequency.value = 880;
-      o.connect(g); g.connect(ctx.destination);
-      g.gain.setValueAtTime(0.4, ctx.currentTime + t);
-      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.2);
-    });
-  } catch { /* sound is a bonus; vibration already fired */ }
 }
 
 interface Timer { end: number; total: number }
@@ -309,7 +299,7 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
                 onLogged={rest => { setEditId(null); if (rest) setTimer({ end: Date.now() + rest * 1000, total: rest }); }} />
             : (
               <>
-                <div className="card done-card"><span className="ok big-ok"><Icon name="check" size={30} /></span><div><b>All sets done</b><div className="muted small">Tap a set below to change it.</div></div></div>
+                <div className="card done-card"><span className="ok big-ok"><Icon name="check" size={30} /></span><div><b>All sets done. Nice work.</b><div className="muted small">Tap a set below if you need to change it.</div></div></div>
                 <Dock>{timerNode}<button className="btn primary" onClick={() => (last ? onFinish() : go(1))}>{last ? 'Review and finish' : 'Next exercise'}</button></Dock>
               </>
             )}
@@ -336,8 +326,30 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
           <button className={session.notes ? 'on' : ''} onClick={() => { setNote(session.notes ?? ''); setPanel('note'); }}><Icon name="note" /><span>Note</span></button>
           <button onClick={() => setPanel('rest')}><Icon name="clock" /><span>Rest {clock(item.rest)}</span></button>
         </div>
-        <button className="btn ghost" onClick={() => setPanel('pullups')}>Extra pull-ups{extras ? ` · ${extras} logged` : ''}</button>
         {item.info.note && <button className="btn ghost" onClick={() => setPanel('info')}><Icon name="info" size={18} /> How to do it</button>}
+
+        <h2>Today's full plan</h2>
+        <div className="card list">
+          {bl.map((b, i) => {
+            const st = stepsFor(b, sets);
+            const n = st.filter(s => s.done).length;
+            return (
+              <button key={i} className={'setrow planrow' + (i === bi ? ' cur' : '') + (n === st.length ? ' done' : '')} onClick={() => go(i - bi)}>
+                <span className={'circle sm' + (n === st.length ? ' on' : '')}>{n === st.length ? <Icon name="check" size={14} /> : null}</span>
+                <span className="grow">
+                  {b.map(p => (
+                    <span className="plan-ex" key={p.ex}>
+                      <span>{b.length > 1 ? <span className="tag">{p.pair}{b.indexOf(p) + 1}</span> : null}{p.info.name}</span>
+                      <span className="muted small">{schemeText(p)}{p.usesWeight && p.targets[0]?.weight != null ? ` · ${fmtKg(p.targets[0].weight)}` : ''}</span>
+                    </span>
+                  ))}
+                </span>
+                <span className="muted small nowrap">{n === st.length ? 'Done' : n ? `${n} of ${st.length}` : i === bi ? 'Now' : ''}</span>
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn ghost" onClick={() => setPanel('pullups')}>Extra pull-ups{extras ? ` · ${extras} logged` : ''}</button>
       </main>
 
       {panel === 'swap' && (
