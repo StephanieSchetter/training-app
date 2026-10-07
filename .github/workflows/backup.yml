@@ -1,0 +1,48 @@
+name: Weekly backup
+
+on:
+  schedule:
+    # Sundays, about 04:00 in Adelaide.
+    - cron: '30 17 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet requests
+      - name: Copy the database into a dated file
+        run: mkdir out && python garmin/backup.py out
+        env:
+          SUPABASE_URL: https://cycpaeykmufxxkhmrvdf.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      - name: Save it in the private backups repository
+        env:
+          BACKUP_DEPLOY_KEY: ${{ secrets.BACKUP_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$BACKUP_DEPLOY_KEY" > ~/.ssh/backup_key
+          chmod 600 ~/.ssh/backup_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/backup_key -o IdentitiesOnly=yes"
+          git clone --quiet git@github.com:StephanieSchetter/training-backups.git store
+          cp out/*.json store/
+          cd store
+          git config user.name "Training app backup"
+          git config user.email "StephanieSchetter@users.noreply.github.com"
+          git add -A
+          git commit --quiet -m "Weekly backup $(date -u +%F)" || echo "Nothing new to save"
+          git push --quiet origin HEAD:main
+          rm -f ~/.ssh/backup_key
