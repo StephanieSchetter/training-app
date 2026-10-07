@@ -224,6 +224,7 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
     if (file.current) file.current.value = '';
   };
   const lastWeight = [...state.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const practiceCount = state.sessions.filter(s => s.practice).length + state.runs.filter(r => r.practice).length;
   const machines = state.profiles.reduce((n, g) => n + Object.keys(g.machineSteps).length, 0);
   const Row = ({ to, title, detail }: { to: Page; title: string; detail: string }) => (
     <button className="line tapline" onClick={() => { setPage(to); window.scrollTo(0, 0); }}>
@@ -282,6 +283,23 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
         <button className="btn" onClick={() => setMessage2(`Saved ${exportAll(state, today())} to your downloads.`)}><Icon name="download" size={18} /> Export all to Excel</button>
         {message2 && <div className="muted small">{message2}</div>}
       </div>
+
+      {practiceCount > 0 && (
+        <>
+          <h2>Practice data</h2>
+          <div className="card">
+            <div className="muted small">{practiceCount} practice session{practiceCount > 1 ? 's' : ''} from before Block {p.block}. They never counted towards anything.</div>
+            <button className="btn danger" onClick={() => update(s => {
+              const ids = new Set(s.sessions.filter(x => x.practice).map(x => x.id));
+              s.sessions = s.sessions.filter(x => !ids.has(x.id));
+              s.sets = s.sets.filter(x => !ids.has(x.sessionId));
+              s.runs = s.runs.filter(x => !x.practice);
+              if (s.activeSessionId && ids.has(s.activeSessionId)) s.activeSessionId = null;
+              if (s.activeRunId && !s.runs.some(r => r.id === s.activeRunId)) s.activeRunId = null;
+            })}>Delete practice data</button>
+          </div>
+        </>
+      )}
 
       <p className="lead small">App version {APP_VERSION}</p>
 

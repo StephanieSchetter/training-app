@@ -11,7 +11,7 @@ const browser = await puppeteer.launch({ executablePath: chrome, headless: true 
 const page = await browser.newPage();
 await page.setViewport({ width: 384, height: 824, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 page.on('pageerror', e => console.log('PAGE ERROR', e.message));
-await page.goto('http://localhost:5173/?local', { waitUntil: 'networkidle0' });
+await page.goto('http://localhost:5173/?local&practice', { waitUntil: 'networkidle0' });
 
 let n = 0;
 const shot = async name => { await new Promise(r => setTimeout(r, 350)); await page.screenshot({ path: join(out, `${String(++n).padStart(2, '0')}-${name}.png`) }); };

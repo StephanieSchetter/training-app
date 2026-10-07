@@ -11,6 +11,7 @@ import { syncNow, SyncView, waitingTooLong } from './sync';
 import { Icon, Segmented, Sheet } from './ui';
 import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from './Views';
 
+const PRACTICE_FOR_TESTS = import.meta.env.DEV && new URLSearchParams(location.search).has('practice');
 const SHORT: Record<string, string> = { easy: 'Easy', intervals: 'Int', threshold: 'Thr', gymA: 'A', gymB: 'B', gymC: 'C', gymD: 'D' };
 const FEELS: { value: Feel; label: string }[] = [{ value: 'better', label: 'Better' }, { value: 'same', label: 'Same' }, { value: 'worse', label: 'Worse' }];
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -306,7 +307,8 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
         ))}
       </div>
 
-      {!started && !VIEW_ONLY && (
+      {/* Practice sessions were removed from the app at Brad's request. They remain reachable only by the scripted tests. */}
+      {PRACTICE_FOR_TESTS && !started && (
         <>
           <h2>Practice run-through</h2>
           <div className="card">

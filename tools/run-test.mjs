@@ -13,7 +13,7 @@ await page.setViewport({ width: 384, height: 824, deviceScaleFactor: 2, isMobile
 page.on('pageerror', e => console.log('PAGE ERROR', e.message));
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const on = async date => { await page.goto(`http://localhost:5173/?local&nocatchup&today=${date}`, { waitUntil: 'networkidle0' }); await wait(200); };
+const on = async date => { await page.goto(`http://localhost:5173/?local&practice&nocatchup&today=${date}`, { waitUntil: 'networkidle0' }); await wait(200); };
 const text = () => page.evaluate(() => document.body.innerText);
 const shot = name => wait(300).then(() => page.screenshot({ path: join(out, `run-${name}.png`) }));
 const click = async (label, nth = 0) => {
