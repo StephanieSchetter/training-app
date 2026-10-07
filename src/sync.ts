@@ -184,9 +184,13 @@ async function pull() {
     return !changedHere;
   });
   update(s => accepted.forEach(r => applyRemote(s, r)));
+  // Only track what this version of the app actually understands and now holds. A record written by a
+  // newer version (a kind this one doesn't know) must never look like "deleted here".
+  const held = localRecords(getState());
   for (const r of accepted) {
-    if (!ownedByPhone(r)) continue;
-    if (r.deleted) delete disk.pushed[keyOf(r)]; else disk.pushed[keyOf(r)] = hashOf(r.data);
+    const k = keyOf(r);
+    if (!ownedByPhone(r) || r.deleted || !held.has(k)) delete disk.pushed[k];
+    else disk.pushed[k] = hashOf(r.data);
   }
   for (const r of incoming) if (!newest || r.updated_at > newest) newest = r.updated_at;
   disk.lastPull = newest;
