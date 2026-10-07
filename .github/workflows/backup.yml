@@ -33,7 +33,8 @@ jobs:
           BACKUP_DEPLOY_KEY: ${{ secrets.BACKUP_DEPLOY_KEY }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$BACKUP_DEPLOY_KEY" > ~/.ssh/backup_key
+          # The key was pasted from Windows, so strip its carriage returns or ssh cannot read it.
+          printf '%s\n' "$BACKUP_DEPLOY_KEY" | tr -d '\r' > ~/.ssh/backup_key
           chmod 600 ~/.ssh/backup_key
           ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/backup_key -o IdentitiesOnly=yes"
