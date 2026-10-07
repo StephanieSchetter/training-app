@@ -18,7 +18,7 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 9;
+export const APP_VERSION = 10;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -70,6 +70,12 @@ function localRecords(s: AppState): Map<string, Rec> {
   for (const x of s.sets) add('set', x.id, x);
   for (const x of s.runs) add('run', x.id, x);
   for (const x of s.alerts) add('alert', x.id, x);
+  for (const x of s.checkins) add('checkin', x.id, x);
+  if (s.program) {
+    add('meta', 'reductions', s.reductions);
+    add('meta', 'tempSwaps', s.tempSwaps);
+    add('meta', 'notices', s.notices);
+  }
   if (s.speeds) add('meta', 'speeds', s.speeds);
   if (s.program) {
     add('meta', 'program', s.program);
@@ -99,6 +105,9 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
   } else if (r.kind === 'alert') {
     if (r.deleted) s.alerts = s.alerts.filter(x => x.id !== r.id);
     else upsert(s.alerts, r.data as AppState['alerts'][number]);
+  } else if (r.kind === 'checkin') {
+    if (r.deleted) s.checkins = s.checkins.filter(x => x.id !== r.id);
+    else upsert(s.checkins, r.data as AppState['checkins'][number]);
   } else if (r.kind === 'garmin_day' && !r.deleted) {
     s.garminDays[r.id] = r.data as AppState['garminDays'][string];
   } else if (r.kind === 'garmin_activity' && !r.deleted) {
@@ -116,12 +125,15 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
     else if (r.id === 'days') s.days = r.data as AppState['days'];
     else if (r.id === 'restOverrides') s.restOverrides = r.data as AppState['restOverrides'];
     else if (r.id === 'speeds') s.speeds = r.data as AppState['speeds'];
+    else if (r.id === 'reductions') s.reductions = r.data as AppState['reductions'];
+    else if (r.id === 'tempSwaps') s.tempSwaps = r.data as AppState['tempSwaps'];
+    else if (r.id === 'notices') s.notices = r.data as AppState['notices'];
   }
 }
 
 /** Records this phone writes. Everything else (Garmin data) is written by the daily pull and only read here. */
 const ownedByPhone = (r: { kind: string; id: string }) =>
-  ['session', 'set', 'run', 'alert', 'profile'].includes(r.kind) || (r.kind === 'meta' && r.id !== 'garmin_status');
+  ['session', 'set', 'run', 'alert', 'profile', 'checkin'].includes(r.kind) || (r.kind === 'meta' && r.id !== 'garmin_status');
 
 interface Pending { upserts: Rec[]; deletes: { kind: string; id: string }[] }
 

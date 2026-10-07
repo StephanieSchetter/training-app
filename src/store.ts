@@ -50,6 +50,10 @@ export interface SessionLog {
   swaps: Record<string, string>;
   warmup: number[];
   badDay?: boolean; readinessAccepted?: boolean; notes?: string;
+  /** Garmin Training Readiness that morning and whether the suggested adjustment was accepted. */
+  readiness?: { score: number; accepted: boolean };
+  /** Readiness under 25, accepted: warm-up and stretching only. */
+  warmupOnly?: boolean;
   startedAt: number; finishedAt?: number;
 }
 export interface SetLog {
@@ -70,11 +74,40 @@ export interface RunLog {
   /** "Could you have done 2 more reps at this speed?" */
   answer?: 'yes' | 'no' | 'dnf';
   timeTrial?: boolean; timeTrialSec?: number;
+  readiness?: { score: number; accepted: boolean };
+  adjust?: RunAdjust;
   speedBefore?: number; speedAfter?: number;
   startedAt: number; finishedAt?: number;
 }
 export interface Speeds { intervals: number; threshold: number; strides: number }
-export interface Alert { id: string; kind: 'intervals-slipping'; date: string; status: 'open' | 'accepted' | 'ignored' }
+export interface Alert { id: string; kind: 'intervals-slipping' | 'rhr-high'; date: string; status: 'open' | 'accepted' | 'ignored' }
+
+export type Feel = 'better' | 'same' | 'worse';
+type Offer = 'pending' | 'yes' | 'no';
+/** Morning-after check-in for one gym session, plus what was offered and whether Brad took it. */
+export interface Checkin {
+  id: string; sessionId: string; date: string; knee: Feel; back: Feel;
+  reduce?: Offer; backFlare?: Offer; blockPull?: Offer;
+}
+/** "10% lighter next time" on one lift, confirmed after a "worse" check-in. Used once. */
+export interface Reduction { id: string; exId: string; createdAt: number; because: 'knee' | 'back' }
+/** A swap that applies by rule: back flare for the rest of a week, or block pulls at the next deadlift session. */
+export interface TempSwap { id: string; kind: 'back-flare' | 'block-pull'; week?: number; createdAt: number }
+export interface Notice { id: string; date: string; text: string }
+/** Readiness-based changes to a run, when accepted. */
+export interface RunAdjust { speedDelta?: number; fewerReps?: number; easy30?: boolean }
+
+export const SHIFTS: { id: string; label: string; hours: string; short: string }[] = [
+  { id: 'early', label: 'Early', hours: '07:30–17:30', short: 'E' },
+  { id: 'mid', label: 'Mid', hours: '08:30–18:30', short: 'M' },
+  { id: 'day', label: 'Day', hours: '10:00–20:00', short: 'D' },
+  { id: 'late', label: 'Late', hours: '12:30–22:30', short: 'L' },
+  { id: 'night', label: 'Night', hours: '22:00–07:30', short: 'N' },
+  { id: 'adelaide-ed', label: 'Adelaide ED', hours: '09:00–17:00', short: 'ED' },
+  { id: 'off', label: 'Off', hours: 'No shift', short: 'Off' },
+  { id: 'travel-train', label: 'Travel — train before', hours: 'Morning session still happens', short: '✈' },
+  { id: 'travel-none', label: 'Travel — no training', hours: 'No session this day', short: '✈' },
+];
 
 /** Current run speeds: the block's starting speeds until a run answer or time trial changes them. */
 export function currentSpeeds(s: AppState): Speeds {
@@ -91,6 +124,10 @@ export interface GarminActivity {
 export interface GarminStatus { ok: boolean; lastSync?: string; lastAttempt?: string; error?: string | null }
 
 export interface AppState {
+  checkins: Checkin[];
+  reductions: Reduction[];
+  tempSwaps: TempSwap[];
+  notices: Notice[];
   /** Read-only copies of what the daily Garmin pull wrote to the database. */
   garminDays: Record<string, GarminDay>;
   garminActs: GarminActivity[];
@@ -124,6 +161,7 @@ function fresh(): AppState {
     stints: [], days: {}, schedule: [], sessions: [], sets: [], restOverrides: {}, activeSessionId: null,
     runs: [], speeds: null, alerts: [], activeRunId: null,
     garminDays: {}, garminActs: [], garminStatus: null,
+    checkins: [], reductions: [], tempSwaps: [], notices: [],
   };
 }
 

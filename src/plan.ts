@@ -3,7 +3,7 @@ import type { Equip, GymProfile } from './engine/weights';
 import { gridStep, roundNearest } from './engine/weights';
 import {
   deloadSetCount, dipsGoWeighted, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
-  PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, SetTarget, suggestRpt, suggestStraight, usableHistory,
+  PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
 } from './engine/progression';
 import type { AppState, Exercise, Scheme, SessionLog, SetLog } from './store';
 
@@ -28,12 +28,28 @@ export interface PlanItem {
   setup?: 'machine' | 'plate' | 'kettlebell';
   level?: number;
   assist?: string;
+  /** Extra reps in reserve on top sets today, from an accepted readiness suggestion. */
+  rirExtra: number;
+}
+
+/** Swaps that apply without Brad choosing them: FIFO equipment, a back flare this week, block pulls after a sore knee. */
+export function autoSwaps(state: AppState, gymId: string, week: number): Record<string, string> {
+  const out: Record<string, string> = {};
+  const add = (when: string) => { for (const sw of state.program!.swaps) if (sw.when === when) out[sw.from] = sw.to; };
+  if (gymId === 'fifo') add('fifo');
+  const deadliftSince = (t: number) => state.sessions.some(s => !s.practice && s.startedAt > t && state.sets.some(x => x.sessionId === s.id && (x.plannedExId === 'deadlift')));
+  for (const t of state.tempSwaps) {
+    if (t.kind === 'block-pull' && !deadliftSince(t.createdAt)) add('knee-after-deadlift');
+  }
+  // A back flare outranks the block pull: no deadlift variation at all that week.
+  for (const t of state.tempSwaps) if (t.kind === 'back-flare' && t.week === week) add('back-flare');
+  return out;
 }
 
 const DELOAD_WEEK = 8;
 
 /** Working sets of one exercise in one session, grouped by set number. */
-function sessionResult(sets: SetLog[], session: SessionLog): PastResult | null {
+function sessionResult(sets: SetLog[], session: SessionLog, worseBefore: boolean): PastResult | null {
   const work = sets.filter(s => !s.rampUp && !s.extra).sort((a, b) => a.setNo - b.setNo);
   if (!work.length) return null;
   const bySet = new Map<number, SetLog[]>();
@@ -43,7 +59,7 @@ function sessionResult(sets: SetLog[], session: SessionLog): PastResult | null {
     weight: work[0].weight ?? 0,
     // each-leg lifts: both legs have to get there, so the lower side counts
     reps: [...bySet.values()].map(g => Math.min(...g.map(x => x.reps))),
-    excused: !!(session.badDay || session.readinessAccepted),
+    excused: !!(session.badDay || session.readinessAccepted || session.readiness?.accepted || worseBefore),
     deload: session.week === DELOAD_WEEK,
   };
 }
@@ -51,12 +67,18 @@ function sessionResult(sets: SetLog[], session: SessionLog): PastResult | null {
 interface Past { session: SessionLog; sets: SetLog[]; result: PastResult }
 
 export function pastFor(state: AppState, exId: string, before: SessionLog): Past[] {
-  return state.sessions
-    .filter(s => !s.practice && s.id !== before.id && s.startedAt < before.startedAt)
-    .sort((a, b) => a.startedAt - b.startedAt)
+  const real = state.sessions.filter(s => !s.practice).sort((a, b) => a.startedAt - b.startedAt);
+  // A miss is excused when the check-in the morning after the previous gym session was "worse" (6.6).
+  const worseBefore = (s: SessionLog) => {
+    const prev = real.filter(p => p.startedAt < s.startedAt).at(-1);
+    const c = prev && state.checkins.find(x => x.sessionId === prev.id);
+    return !!c && (c.knee === 'worse' || c.back === 'worse');
+  };
+  return real
+    .filter(s => s.id !== before.id && s.startedAt < before.startedAt)
     .map(session => {
       const sets = state.sets.filter(x => x.sessionId === session.id && x.exId === exId);
-      const result = sessionResult(sets, session);
+      const result = sessionResult(sets, session, worseBefore(session));
       return result ? { session, sets, result } : null;
     })
     .filter((x): x is Past => x !== null);
@@ -191,6 +213,26 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       reason = 'Deload: week 7 weights, half the sets';
     }
 
+    // Next-morning rule (6.7): a confirmed "10% lighter next time" applies until this lift is next logged.
+    const reduction = deload ? undefined : state.reductions.find(r => r.exId === ex && !past.some(p => p.session.startedAt > r.createdAt));
+    if (reduction && targets[0]?.weight != null) {
+      const c = ctx();
+      const top = reduceTenPercent(targets[0].weight, c);
+      targets = scheme.t === 'rpt' || equip === 'added' && item.scheme.t === 'pullup'
+        ? rptSets(top, targets.map(t => t.reps), targets[0].reps, c)
+        : targets.map(t => ({ ...t, weight: t.weight === null ? null : reduceTenPercent(t.weight, c) }));
+      reason = `10% lighter after your ${reduction.because} check-in`;
+    }
+
+    // Accepted readiness adjustment (8.1): 25–49 drops one set from main lifts; 50–74 and 25–49 add 1 RIR.
+    const isMainLift = item.scheme.t === 'rpt';
+    const ready = session.readiness?.accepted ? session.readiness.score : null;
+    if (ready !== null && ready < 50 && isMainLift && targets.length > 1) {
+      targets = targets.slice(0, -1);
+      repsLabel = repsLabel.slice(0, -1);
+    }
+    const rirExtra = ready !== null && ready < 75 ? 1 : 0;
+
     const usesWeight = equip !== 'bodyweight';
     let setup: PlanItem['setup'];
     if (equip === 'machine' && gridStep(equip, gym, ex) === null) setup = 'machine';
@@ -203,7 +245,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       swapLabel: swapped ? `Swapped from ${program.exercises[item.ex].name}` : undefined,
       equip, usesWeight, targets, repsLabel, reason,
       rest: state.restOverrides[ex] ?? (isMain ? 180 : 90),
-      isMain, setup, level, assist,
+      isMain, setup, level, assist, rirExtra,
     };
   });
 }

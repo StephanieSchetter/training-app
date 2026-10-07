@@ -13,7 +13,7 @@ await page.setViewport({ width: 384, height: 824, deviceScaleFactor: 2, isMobile
 page.on('pageerror', e => console.log('PAGE ERROR', e.message));
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const on = async date => { await page.goto(`http://localhost:5173/?local&today=${date}`, { waitUntil: 'networkidle0' }); await wait(200); };
+const on = async date => { await page.goto(`http://localhost:5173/?local&nocatchup&today=${date}`, { waitUntil: 'networkidle0' }); await wait(200); };
 const text = () => page.evaluate(() => document.body.innerText);
 const shot = name => wait(300).then(() => page.screenshot({ path: join(out, `run-${name}.png`) }));
 const click = async (label, nth = 0) => {
@@ -32,7 +32,7 @@ const summaryOf = async label => (await text()).split('\n').find(l => l.includes
 
 async function doIntervals(date, answer, { skipLast = false } = {}) {
   await on(date);
-  await click('Start Intervals');
+  await click('Open Intervals'); await click('Start this run');
   if (date === '2026-10-14') await shot('first-rep');
   let n = await page.evaluate(() => document.querySelectorAll('.segs > *').length);
   if (skipLast) n -= 3;
@@ -75,7 +75,7 @@ check('10c: accepting removes the next Gym B', !(await text()).split('COMING UP'
 // Week 4: time trial 21:00
 await on('2026-11-04');
 check('10c: speed dropped 0.3 for the following week', true, 'checked through the time-trial "was" value below');
-await click('Start Intervals');
+await click('Open Intervals'); await click('Enter my time');
 await click('Less Minutes');
 for (let i = 0; i < 30; i++) await click('Less Seconds');
 const tt = await text();

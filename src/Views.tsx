@@ -3,9 +3,11 @@ import { useRef, useState } from 'react';
 import { addDays, isGym, Slot } from './engine/schedule';
 import { matchActivity, matchLaps, Rep } from './engine/garmin';
 import { schemeText } from './Gym';
-import { buildPlan } from './plan';
-import { buildRun } from './runplan';
-import { AppState, currentSpeeds, gymForDate, Program, RunType, SessionLog, setProgram, today, update } from './store';
+import { ReadinessCard } from './Gym';
+import { applyDoubleUp, heavyBeforeIntervals, shiftFrom, travelOptions } from './engine/schedule';
+import { autoSwaps, buildPlan } from './plan';
+import { buildRun, runAdjustFor } from './runplan';
+import { AppState, currentSpeeds, gymForDate, Program, RunType, SessionLog, setProgram, SHIFTS, today, uid, update } from './store';
 import { APP_VERSION, syncNow, SyncView, waitingTooLong } from './sync';
 import { AppBar, Dock, Icon, Sheet } from './ui';
 
@@ -62,12 +64,15 @@ export type Target = { slotIdx: number } | { sessionId: string };
 /** The plan as it would be on that date: gym in use, FIFO swaps, and suggestions from history so far. */
 function virtualSession(state: AppState, slot: Slot): SessionLog {
   const gym = gymForDate(state, slot.date);
-  const swaps: Record<string, string> = {};
-  if (gym.id === 'fifo') for (const sw of state.program!.swaps) if (sw.when === 'fifo') swaps[sw.from] = sw.to;
+  const swaps = autoSwaps(state, gym.id, slot.week);
   return { id: `preview-${slot.idx}`, slotIdx: slot.idx, type: slot.type, date: slot.date, gymId: gym.id, week: slot.week, swaps, warmup: [], startedAt: Date.now() };
 }
 
-export function SessionView({ state, target, onBack, onStart, onStartRun }: { state: AppState; target: Target; onBack: () => void; onStart: (slot: Slot) => void; onStartRun: (slot: Slot) => void }) {
+export function SessionView({ state, target, onBack, onStart, onStartRun }: {
+  state: AppState; target: Target; onBack: () => void; onStart: (slot: Slot) => void;
+  onStartRun: (slot: Slot, readiness?: { score: number; accepted: boolean }) => void;
+}) {
+  const [runChoice, setRunChoice] = useState<boolean | null>(null);
   const program = state.program!;
   const slot = 'slotIdx' in target ? state.schedule.find(s => s.idx === target.slotIdx) : undefined;
   const logged = 'sessionId' in target
@@ -81,7 +86,10 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
   const when = date === t ? 'Today' : date < t ? 'Past session' : 'Upcoming';
 
   if (!isGym(type as Slot['type'])) {
-    const run = program.running ? buildRun(program, week, type as RunType, currentSpeeds(state)) : null;
+    // Today only: Garmin readiness can suggest an easier version; the preview follows the choice.
+    const score = date === t ? state.garminDays[t]?.readiness ?? null : null;
+    const adjust = score !== null && runChoice === true ? runAdjustFor(score, type as RunType) : undefined;
+    const run = program.running ? buildRun(program, week, type as RunType, currentSpeeds(state), adjust) : null;
     const done = slot ? state.runs.filter(r => r.slotIdx === slot.idx).at(-1) : undefined;
     const ANSWERS = { yes: 'Yes, could have done 2 more reps', no: 'No, that was the limit', dnf: "Couldn't finish all reps" };
     if (done) {
@@ -127,6 +135,9 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
                 <div><div className="overline">{run.timeTrial ? 'Where' : 'Incline'}</div><b>{run.timeTrial ? 'Outdoors' : program.running!.incline}</b></div>
               </div>
               <p className="lead">{run.summary}</p>
+              {date === t && !run.timeTrial && slot && !slot.done && (
+                <ReadinessCard score={score} type={type} choice={runChoice} onChoose={(_s, accepted) => setRunChoice(accepted)} />
+              )}
               {run.over8 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than 8 km in total.</div>}
               {run.sections.map(sec => (
                 <div key={sec.title} className="stack">
@@ -146,7 +157,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
             </>
           )}
         </main>
-        {run && slot && date === t && !slot.done && <Dock><button className="btn primary" onClick={() => onStartRun(slot)}>{run.timeTrial ? 'Enter my time' : 'Start this run'}</button></Dock>}
+        {run && slot && date === t && !slot.done && <Dock><button className="btn primary" onClick={() => onStartRun(slot, score !== null && runChoice !== null && !run.timeTrial ? { score, accepted: runChoice } : undefined)}>{run.timeTrial ? 'Enter my time' : 'Start this run'}</button></Dock>}
       </div>
     );
   }
@@ -214,10 +225,63 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: { st
   );
 }
 
+/** Choices for a "Travel — no training" day that still has a session on it (spec 4.3). */
+export function TravelCard({ state, date }: { state: AppState; date: string }) {
+  if (state.days[date] !== 'travel-none') return null;
+  const opts = travelOptions(state.schedule, date);
+  const slot = state.schedule.find(s => s.date === date && !s.done && !s.skipped);
+  if (!slot || !opts.choices.length) return null;
+  const set = (fn: (s: AppState) => void) => update(fn);
+  return (
+    <div className="card alert-card">
+      <div className="overline">Travel day · {niceDate(date, true)}</div>
+      <b>{NAMES[slot.type]} is planned, but you're not training this day. What should happen to it?</b>
+      {opts.choices.includes('double-up') && (
+        <button className="btn option" onClick={() => set(s => { s.schedule = applyDoubleUp(s.schedule, date); })}>
+          <b>Double up the next day</b><span className="small muted">{opts.doubleUpOrder!.map(x => NAMES[x]).join(' first, then ')} on {niceDate(addDays(date, 1))}</span>
+        </button>
+      )}
+      <button className="btn option" onClick={() => set(s => { s.schedule = shiftFrom(s.schedule, date, 1); })}>
+        <b>Move everything a day later</b><span className="small muted">Every remaining session shifts by one day</span>
+      </button>
+      {slot.type !== 'intervals' && (
+        <button className="btn option" onClick={() => set(s => { s.schedule.find(x => x.idx === slot.idx)!.skipped = true; })}>
+          <b>Skip {NAMES[slot.type]}</b><span className="small muted">Leave it out and keep the rest of the schedule as it is</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Guard (4.4): a heavy session the day before intervals, with the offer to swap gym sessions around. */
+export function HeavyGuardCard({ state }: { state: AppState }) {
+  const t = today();
+  const heavy = heavyBeforeIntervals(state.schedule.filter(s => s.date >= t))[0];
+  if (!heavy) return null;
+  const other = state.schedule.find(s => s.date > heavy.date && s.type.startsWith('gym') && s.type !== 'gymC' && !s.done && !s.skipped);
+  return (
+    <div className="card alert-card">
+      <div className="overline">Heads-up</div>
+      <b>{NAMES[heavy.type]} now falls on {niceDate(heavy.date, true)}, the day before intervals.</b>
+      <div className="muted">Heavy lifting the day before intervals usually costs you on the run.</div>
+      {other && (
+        <button className="btn" onClick={() => update(s => {
+          const a = s.schedule.find(x => x.idx === heavy.idx)!;
+          const b = s.schedule.find(x => x.idx === other.idx)!;
+          [a.type, b.type] = [b.type, a.type];
+        })}>Swap it with {NAMES[other.type]} ({niceDate(other.date)})</button>
+      )}
+    </div>
+  );
+}
+
 export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Target) => void }) {
   const t = today();
   const [month, setMonth] = useState(t.slice(0, 7));
   const [picked, setPicked] = useState(t);
+  const [sheet, setSheet] = useState<'shift' | 'stint' | null>(null);
+  const [draft, setDraft] = useState({ location: 'Port Hedland', start: t, end: t });
+  const shiftOf = (d: string) => SHIFTS.find(x => x.id === state.days[d]);
   const first = `${month}-01`;
   const dow = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7; // Monday = 0
   const start = addDays(first, -dow);
@@ -258,7 +322,7 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
               <span className="cal-num">{Number(d.slice(8))}</span>
               {sl.map(s => <span key={s.idx} className={'chip ' + (isGym(s.type) ? 'gym' : 'run') + (s.done ? ' done' : '')}>{SHORT[s.type]}</span>)}
               {ex.length > 0 && <span className="chip practice">P</span>}
-              {state.days[d]?.startsWith('travel') && <span className="chip travel">✈</span>}
+              {shiftOf(d) && <span className={'chip ' + (state.days[d].startsWith('travel') ? 'travel' : 'shift')}>{shiftOf(d)!.short}</span>}
             </button>
           );
         })}
@@ -268,12 +332,16 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
       </div>
 
       <h2>{niceDate(picked, true)}{picked === t ? ' · Today' : ''}</h2>
-      {(stint || dayType) && (
-        <div className="card muted">
-          {stint ? `FIFO: ${stint.location}. ` : ''}{dayType === 'travel-train' ? 'Travel day. Train before you fly.' : dayType === 'travel-none' ? 'Travel day. No training.' : ''}
+      <button className="card row tapcard" onClick={() => setSheet('shift')}>
+        <div className="grow">
+          <div className="overline">Shift</div>
+          <b>{shiftOf(picked)?.label ?? 'Not set'}</b>
+          <div className="muted small">{shiftOf(picked)?.hours ?? 'Tap to set your shift or a travel day'}{stint ? ` · FIFO: ${stint.location}` : ''}</div>
         </div>
-      )}
-      {pickedSlots.length + pickedExtras.length === 0 && <div className="card muted">Nothing planned for this day.</div>}
+        <span className="muted"><Icon name="right" /></span>
+      </button>
+      <TravelCard state={state} date={picked} />
+      {pickedSlots.length + pickedExtras.length === 0 && dayType !== 'travel-none' && <div className="card muted">Nothing planned for this day.</div>}
       {pickedSlots.map(s => (
         <button className="card row tapcard" key={s.idx} onClick={() => onOpen({ slotIdx: s.idx })}>
           <TypeIcon type={s.type} />
@@ -288,6 +356,49 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
           <span className="muted"><Icon name="right" /></span>
         </button>
       ))}
+
+      <h2>FIFO stints</h2>
+      <div className="card list">
+        {[...state.stints].sort((a, b) => a.start.localeCompare(b.start)).map(s => (
+          <div className="line" key={s.start + s.location}>
+            <div><div>{s.location}</div><div className="muted small">{niceDate(s.start)} to {niceDate(s.end)} · FIFO gym</div></div>
+            <button className="icon-btn" aria-label={`Remove ${s.location} stint`} onClick={() => update(st => { st.stints = st.stints.filter(x => !(x.start === s.start && x.end === s.end && x.location === s.location)); })}><Icon name="trash" size={18} /></button>
+          </div>
+        ))}
+        {state.stints.length === 0 && <div className="line muted">None added yet.</div>}
+      </div>
+      <button className="btn" onClick={() => { setDraft({ location: 'Port Hedland', start: picked, end: picked }); setSheet('stint'); }}>Add a FIFO stint</button>
+
+      {sheet === 'shift' && (
+        <Sheet title={niceDate(picked, true)} onClose={() => setSheet(null)}>
+          <div className="grid2">
+            {SHIFTS.map(x => (
+              <button key={x.id} className={'btn option' + (state.days[picked] === x.id ? ' on' : '')} onClick={() => { update(s => { s.days[picked] = x.id; }); setSheet(null); }}>
+                <b>{x.label}</b><span className="small muted">{x.hours}</span>
+              </button>
+            ))}
+          </div>
+          {state.days[picked] && <button className="btn ghost" onClick={() => { update(s => { delete s.days[picked]; }); setSheet(null); }}>Clear this day</button>}
+        </Sheet>
+      )}
+      {sheet === 'stint' && (
+        <Sheet title="Add a FIFO stint" onClose={() => setSheet(null)}>
+          <p className="muted">The app switches to the FIFO gym, its swaps and its weight steps for these dates.</p>
+          <label className="field"><span className="field-label">Location</span>
+            <input value={draft.location} onChange={e => setDraft({ ...draft, location: e.target.value })} />
+          </label>
+          <div className="grid2">
+            <label className="field"><span className="field-label">First day</span>
+              <input type="date" value={draft.start} onChange={e => setDraft({ ...draft, start: e.target.value, end: e.target.value > draft.end ? e.target.value : draft.end })} />
+            </label>
+            <label className="field"><span className="field-label">Last day</span>
+              <input type="date" value={draft.end} min={draft.start} onChange={e => setDraft({ ...draft, end: e.target.value })} />
+            </label>
+          </div>
+          <button className="btn primary" disabled={!draft.location.trim() || !draft.start || draft.end < draft.start}
+            onClick={() => { update(s => { s.stints.push({ location: draft.location.trim(), start: draft.start, end: draft.end, gym: 'fifo' }); }); setSheet(null); }}>Add stint</button>
+        </Sheet>
+      )}
     </main>
   );
 }

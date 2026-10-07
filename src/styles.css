@@ -166,6 +166,9 @@ input:focus, textarea:focus { border-color: var(--accent); }
 
 .stats.four { grid-template-columns: repeat(4, 1fr); } .stats.four > div { padding: 12px 8px; } .stats.four b { font-size: 17px; } .stats.four .overline { font-size: 10px; letter-spacing: .04em; }
 .alert-card { border-color: var(--warn); }
+.chip.shift { background: var(--raised); color: var(--muted); }
+.btn.on { background: var(--text); color: var(--bg); border-color: transparent; }
+.btn.on .muted { color: inherit; opacity: .7; }
 .btn.primary.fit-h { min-height: var(--tap); font-size: 16px; }
 .targ.run-now { font-size: 26px; }
 

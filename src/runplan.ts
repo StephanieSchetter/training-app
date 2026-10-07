@@ -1,6 +1,14 @@
 // Builds the full prescription for one run (spec 5.3) from the block's running plan.
 import { MAX_RUN_KM, mmss, repSeconds } from './engine/running';
-import type { Program, RunType, Speeds } from './store';
+import { readinessSuggestion } from './engine/running';
+import type { SessionType } from './engine/schedule';
+import type { Program, RunAdjust, RunType, Speeds } from './store';
+
+/** What an accepted readiness suggestion does to today's run. Empty when nothing changes. */
+export function runAdjustFor(score: number, type: RunType): RunAdjust {
+  const s = readinessSuggestion(score, type as SessionType);
+  return { speedDelta: s.speedDelta, fewerReps: s.fewerThresholdReps, easy30: s.replaceWith === 'easy-30' || undefined };
+}
 
 export interface RunLine { text: string; detail?: string; km: number; /** A rep or main run whose speed is logged. */ work?: boolean; speed?: number }
 export interface RunSection { title: string; lines: RunLine[] }
@@ -11,11 +19,20 @@ const mins = (m: number) => (m < 1 ? `${Math.round(m * 60)} sec` : Number.isInte
 const dist = (km: number) => (km < 1 ? `${Math.round(km * 1000)} m` : `${km} km`);
 
 /** speeds: the current interval / threshold / stride speeds (they move with the weekly answers and time trials). */
-export function buildRun(program: Program, week: number, type: RunType, speeds?: Speeds): RunPlan | null {
+export function buildRun(program: Program, week: number, type: RunType, speeds?: Speeds, adjust?: RunAdjust): RunPlan | null {
   const plan = program.running;
-  const w = plan?.weeks[String(week)];
-  if (!plan || !w) return null;
+  const base = plan?.weeks[String(week)];
+  if (!plan || !base) return null;
   const sp = { ...plan.speeds, ...(speeds ?? {}) };
+  // An accepted readiness suggestion (8.1) changes today only; the stored speeds are untouched.
+  const d = adjust?.speedDelta ?? 0;
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  sp.intervals = r1(sp.intervals + d);
+  sp.threshold = r1(sp.threshold + d);
+  const w = structuredClone(base);
+  w.easy.speed = r1(w.easy.speed + d);
+  if ('easyKm' in w.threshold) w.threshold.speed = r1(w.threshold.speed + d);
+  else if (adjust?.fewerReps) w.threshold.reps = Math.max(1, w.threshold.reps - adjust.fewerReps);
 
   const warm: RunSection = { title: 'Warm-up', lines: [
     { text: '8 min, building from 9 to 10.5 km/h', km: kmFor(8, 9.75) },
@@ -39,7 +56,9 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
     if (withStrides) sections.push(strides);
   };
 
-  if (type === 'easy') {
+  if (adjust?.easy30) {
+    easyRun('30 min', kmFor(30, base.easy.speed), base.easy.speed, false, 30);
+  } else if (type === 'easy') {
     easyRun(`${w.easy.min} min`, kmFor(w.easy.min, w.easy.speed), w.easy.speed, w.easy.strides, w.easy.min);
   } else if (type === 'intervals') {
     const iv = w.intervals;

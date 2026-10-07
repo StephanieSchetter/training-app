@@ -2,8 +2,10 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { gridStep, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
-import { blocks, buildPlan, lastSet, PlanItem, Step, stepsFor } from './plan';
-import { AppState, SessionLog, SetLog, uid, update, useStore, write } from './store';
+import { readinessSuggestion } from './engine/running';
+import type { SessionType, Slot } from './engine/schedule';
+import { autoSwaps, blocks, buildPlan, lastSet, PlanItem, Step, stepsFor } from './plan';
+import { AppState, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
 import { AppBar, clock, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
 type Phase = 'start' | 'warmup' | 'lifts' | 'finish';
@@ -61,6 +63,38 @@ function RestTimer({ timer, onAdd, onClose }: { timer: Timer; onAdd: () => void;
   );
 }
 
+/** Begin a gym session today. No slot means a practice run-through that never counts. */
+export function startGym(state: AppState, type: string, slot: Slot | null) {
+  const date = today();
+  const gym = gymForDate(state, date);
+  const week = slot ? slot.week : 1;
+  const session: SessionLog = {
+    id: uid(), slotIdx: slot ? slot.idx : null, type, date, gymId: gym.id, week,
+    practice: !slot, swaps: autoSwaps(state, gym.id, slot ? week : -1), warmup: [], startedAt: Date.now(),
+  };
+  write('sessions', session.id, s => { s.sessions.push(session); s.activeSessionId = session.id; });
+}
+
+/** Today's Garmin readiness and the suggestion that goes with it (spec 8.1). Brad accepts or ignores; the choice is stored. */
+export function ReadinessCard({ score, type, choice, onChoose }: { score: number | null; type: string; choice: boolean | null; onChoose: (score: number, accepted: boolean) => void }) {
+  if (score === null) return <div className="card muted">No readiness score from Garmin for today yet. Train as planned.</div>;
+  const s = readinessSuggestion(score, type as SessionType);
+  if (s.band === '75+' || (s.band === '50-74' && !type.startsWith('gym'))) {
+    return <div className="card"><div className="row"><span>Readiness <b>{score}</b></span><span className="ok">As planned</span></div></div>;
+  }
+  return (
+    <div className="card alert-card">
+      <div className="row"><span>Readiness <b>{score}</b></span><span className="overline">Suggestion</span></div>
+      <b>{s.text}</b>
+      <div className="grid2">
+        <button className={'btn' + (choice === false ? ' on' : '')} aria-pressed={choice === false} onClick={() => onChoose(score, false)}>Ignore</button>
+        <button className={'btn' + (choice === true ? ' on' : '')} aria-pressed={choice === true} onClick={() => onChoose(score, true)}>Accept</button>
+      </div>
+      {choice === null && <div className="muted small">Your choice is saved either way. Accepting means a miss today won't count against you.</div>}
+    </div>
+  );
+}
+
 function discard(sessionId: string) {
   update(s => {
     s.sessions = s.sessions.filter(x => x.id !== sessionId);
@@ -101,13 +135,19 @@ export function GymSession({ sessionId }: { sessionId: string }) {
         <main className="page">
           <div className="stats">
             <div><div className="overline">Week</div><b>{session.week} of {program.weeks}</b></div>
-            <div><div className="overline">RIR target</div><b>{program.rirByWeek[session.week]}</b></div>
+            <div><div className="overline">RIR target</div><b>{program.rirByWeek[session.week]}{plan[0]?.rirExtra ? ' +1' : ''}</b></div>
             <div><div className="overline">Gym</div><b>{gym.name}</b></div>
           </div>
           <p className="lead">{program.weekNotes[session.week]}{program.sessions[session.type].note ? ` ${program.sessions[session.type].note}` : ''}</p>
 
           <h2>Readiness</h2>
-          <div className="card muted">No Garmin data yet. Suggestions will appear here once Garmin is connected.</div>
+          <ReadinessCard score={state.garminDays[session.date]?.readiness ?? null} type={session.type}
+            choice={session.readiness ? session.readiness.accepted : null}
+            onChoose={(score, accepted) => write('sessions', session.id, s => {
+              const x = s.sessions.find(z => z.id === session.id)!;
+              x.readiness = { score, accepted };
+              x.warmupOnly = accepted && readinessSuggestion(score, session.type as SessionType).replaceWith === 'warmup-and-stretch' ? true : undefined;
+            })} />
 
           {swapped.length > 0 && (
             <>
@@ -165,9 +205,9 @@ export function GymSession({ sessionId }: { sessionId: string }) {
               </button>
             );
           })}
-          <p className="lead">Then 1–2 lighter ramp-up sets of the first lift before the top set.</p>
+          <p className="lead">{session.warmupOnly ? 'Readiness is very low, so today is warm-up and stretching only.' : 'Then 1–2 lighter ramp-up sets of the first lift before the top set.'}</p>
         </main>
-        <Dock><button className="btn primary" onClick={() => setPhase('lifts')}>Start lifting</button></Dock>
+        <Dock><button className="btn primary" onClick={() => setPhase(session.warmupOnly ? 'finish' : 'lifts')}>{session.warmupOnly ? 'Done for today' : 'Start lifting'}</button></Dock>
         {leaveSheet}
       </div>
     );
@@ -506,7 +546,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       <div className={'card target-card' + (done ? ' editing' : '')}>
         <div className="row">
           <div className="overline">{done ? 'Editing · ' : ''}Set {round + 1} of {item.targets.length}{side ? ` · ${sideName(side)} side` : ''}</div>
-          <div className="overline">RIR target {state.program!.rirByWeek[session.week]}</div>
+          <div className="overline">RIR target {state.program!.rirByWeek[session.week]}{item.rirExtra && item.isMain && round === 0 ? ' +1' : ''}</div>
         </div>
         <div className="targ">
           {item.usesWeight ? (findLoad ? 'Find your load' : fmtKg(target.weight)) : 'Bodyweight'}

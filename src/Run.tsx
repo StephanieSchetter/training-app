@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { adjustSpeed, mmss, SUB20_SPEED, timeTrialReset } from './engine/running';
 import type { Slot } from './engine/schedule';
 import { useWakeLock } from './Gym';
-import { buildRun } from './runplan';
+import { buildRun, runAdjustFor } from './runplan';
 import { AppState, currentSpeeds, RunLog, RunType, today, uid, update, useStore } from './store';
 import { AppBar, Dock, Elapsed, Icon, Sheet, Stepper } from './ui';
 
@@ -12,10 +12,12 @@ export function startPracticeRun(state: AppState, type: RunType, week: number) {
   startRun(state, { idx: -1, week, type, date: today(), order: 1 }, true);
 }
 
-export function startRun(state: AppState, slot: Slot, practice = false) {
+export function startRun(state: AppState, slot: Slot, practice = false, readiness?: { score: number; accepted: boolean }) {
   const type = slot.type as RunType;
-  const plan = buildRun(state.program!, slot.week, type, currentSpeeds(state))!;
+  const adjust = readiness?.accepted ? runAdjustFor(readiness.score, type) : undefined;
+  const plan = buildRun(state.program!, slot.week, type, currentSpeeds(state), adjust)!;
   const run: RunLog = {
+    readiness, adjust,
     id: uid(), slotIdx: practice ? null : slot.idx, practice: practice || undefined, type, date: slot.date, week: slot.week,
     title: plan.title + (practice ? ' · Practice' : ''), timeTrial: plan.timeTrial || undefined,
     segs: plan.timeTrial ? [] : plan.sections.flatMap(sec => sec.lines.map(l => ({ section: sec.title, text: l.text, detail: l.detail, work: !!l.work, prescribed: l.speed, actual: l.speed, km: l.km, done: false }))),
@@ -57,7 +59,7 @@ export function RunSession({ runId }: { runId: string }) {
   const [asking, setAsking] = useState(false);
   useWakeLock();
 
-  const plan = buildRun(state.program!, run.week, run.type, currentSpeeds(state))!;
+  const plan = buildRun(state.program!, run.week, run.type, currentSpeeds(state), run.adjust)!;
   const closeBtn = <button className="icon-btn" aria-label="Leave run" onClick={() => (run.segs.some(s => s.done) ? setLeaving(true) : discard(run.id))}><Icon name="x" /></button>;
   const leaveSheet = leaving && (
     <Sheet title="Leave this run?" onClose={() => setLeaving(false)}>
