@@ -28,6 +28,30 @@ export function timeTrialReset(timeSec: number, pre: { intervals: number; stride
   };
 }
 
+// ---- Easy pace after a time trial (agreed with Brad, 8 Oct 2026; replaces the spec's fixed TT - 3.25) ----
+
+export const EASY_HR_OK = 145;
+export const EASY_HR_HIGH = 152;
+export const EASY_STEP = 0.2;
+
+/** The most easy speed is ever allowed to be: time-trial speed minus 3.25. */
+export function easyCeiling(timeTrialSec: number): number {
+  return round1(5 / (timeTrialSec / 3600) - 3.25);
+}
+
+/**
+ * Looks at the last three easy runs done at the current speed (average heart rate from the watch).
+ * All three at 145 or under -> suggest +0.2, never past the ceiling. Any at 152 or over -> suggest -0.2.
+ * Otherwise, or with fewer than three runs to go on, no change.
+ */
+export function easyPaceSuggestion(current: number, ceiling: number, hrAtCurrentSpeed: number[]): { speed: number; why: 'up' | 'down' } | null {
+  const last = hrAtCurrentSpeed.slice(-3);
+  if (last.length < 3) return null;
+  if (last.some(hr => hr >= EASY_HR_HIGH)) return { speed: round1(current - EASY_STEP), why: 'down' };
+  if (last.every(hr => hr <= EASY_HR_OK) && current < ceiling) return { speed: Math.min(ceiling, round1(current + EASY_STEP)), why: 'up' };
+  return null;
+}
+
 /** Seconds a distance rep takes on the treadmill at a given speed. */
 export function repSeconds(km: number, speed: number): number {
   return Math.round((km / speed) * 3600);

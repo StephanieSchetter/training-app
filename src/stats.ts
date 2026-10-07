@@ -1,5 +1,6 @@
 // Turns what has been logged into the numbers behind the charts (spec section 11).
 import { matchActivity } from './engine/garmin';
+import { easyPaceSuggestion } from './engine/running';
 import { addDays } from './engine/schedule';
 import { AppState, currentSpeeds, RunLog } from './store';
 
@@ -116,6 +117,32 @@ export function easyHrSeries(state: AppState): Series[] {
     lastSpeed = speed;
   }
   return [{ name: 'Average HR', points }];
+}
+
+export interface EasyPace { current: number; ceiling: number; heartRates: number[]; speed: number; why: 'up' | 'down'; evidenceId: string }
+
+/**
+ * The easy-pace suggestion, if there is one to make: only after a time trial has set a ceiling, and
+ * only from easy runs logged at the current easy speed with a matching watch activity.
+ */
+export function easyPace(state: AppState, today: string): EasyPace | null {
+  const ceiling = state.speeds?.easyCeiling;
+  const plan = state.program!.running;
+  if (ceiling === undefined || !plan) return null;
+  const next = state.schedule.find(s => s.type === 'easy' && !s.done && !s.skipped && s.date >= today);
+  const current = state.speeds?.easy ?? plan.weeks[String(next?.week ?? 0)]?.easy.speed;
+  if (current === undefined) return null;
+  const rows = realRuns(state).filter(isEasy).flatMap(r => {
+    const seg = r.segs.find(s => s.work && s.done);
+    const act = matchActivity(state.garminActs, r.date, 'run', r.startedAt);
+    return seg && act?.avgHr && (seg.actual ?? seg.prescribed) === current ? [{ id: r.id, hr: Math.round(act.avgHr) }] : [];
+  });
+  const s = easyPaceSuggestion(current, ceiling, rows.map(r => r.hr));
+  if (!s) return null;
+  const evidenceId = `easy-${rows.at(-1)!.id}`;
+  // Already answered for this set of runs: wait for the next easy run before suggesting again.
+  if (state.alerts.some(a => a.id === evidenceId)) return null;
+  return { current, ceiling, heartRates: rows.slice(-3).map(r => r.hr), ...s, evidenceId };
 }
 
 export function timeTrialSeries(state: AppState): Series[] {

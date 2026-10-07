@@ -79,8 +79,14 @@ export interface RunLog {
   speedBefore?: number; speedAfter?: number;
   startedAt: number; finishedAt?: number;
 }
-export interface Speeds { intervals: number; threshold: number; strides: number }
-export interface Alert { id: string; kind: 'intervals-slipping' | 'rhr-high'; date: string; status: 'open' | 'accepted' | 'ignored' }
+export interface Speeds {
+  intervals: number; threshold: number; strides: number;
+  /** Set by a time trial: the most easy speed may ever be (time-trial speed minus 3.25). */
+  easyCeiling?: number;
+  /** Easy speed once Brad has accepted a heart-rate-based change; until then the plan's speed is used. */
+  easy?: number;
+}
+export interface Alert { id: string; kind: 'intervals-slipping' | 'rhr-high' | 'easy-pace'; date: string; status: 'open' | 'accepted' | 'ignored' }
 
 export type Feel = 'better' | 'same' | 'worse';
 type Offer = 'pending' | 'yes' | 'no';

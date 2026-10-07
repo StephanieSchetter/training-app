@@ -5,7 +5,8 @@ import { addDays, isGym, shiftFrom, Slot } from './engine/schedule';
 import { startGym } from './Gym';
 import { startPracticeRun } from './Run';
 import { buildRun } from './runplan';
-import { trendTiles } from './stats';
+import { EASY_HR_HIGH, EASY_HR_OK } from './engine/running';
+import { easyPace, trendTiles } from './stats';
 import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
 import { requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
 import { Icon, Segmented, Sheet, SyncNowButton } from './ui';
@@ -120,6 +121,12 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
   const alerts = state.alerts.filter(a => a.status === 'open');
   const travelDays = Array.from({ length: 15 }, (_, i) => addDays(t, i)).filter(d => state.days[d] === 'travel-none');
 
+  const pace = p.running ? easyPace(state, t) : null;
+  const answerPace = (accept: boolean) => update(s => {
+    // Stored like every other suggestion: what was offered, when, and whether it was taken.
+    s.alerts.push({ id: pace!.evidenceId, kind: 'easy-pace', date: t, status: accept ? 'accepted' : 'ignored' });
+    if (accept) s.speeds = { ...currentSpeeds(s), easy: pace!.speed };
+  });
   const answerAlert = (id: string, accept: boolean) => update(s => {
     const a = s.alerts.find(x => x.id === id)!;
     a.status = accept ? 'accepted' : 'ignored';
@@ -205,6 +212,22 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
           </div>
         </div>
       ))}
+
+      {pace && !VIEW_ONLY && (
+        <div className="card alert-card">
+          <div className="overline">Suggestion · easy pace</div>
+          <b>{pace.why === 'up' ? `Try your next easy run at ${pace.speed.toFixed(1)} km/h` : `Ease your next easy run back to ${pace.speed.toFixed(1)} km/h`}</b>
+          <div className="muted">
+            Your last three easy runs at {pace.current} km/h averaged {pace.heartRates.join(', ')} bpm.{' '}
+            {pace.why === 'up' ? `All at ${EASY_HR_OK} or under, so there's room to go a little quicker.` : `At least one was ${EASY_HR_HIGH} or over, which is too hard for an easy day.`}
+            {pace.why === 'up' ? ` The most easy pace can be right now is ${pace.ceiling.toFixed(1)} km/h.` : ''}
+          </div>
+          <div className="grid2">
+            <button className="btn" onClick={() => answerPace(false)}>Keep {pace.current}</button>
+            <button className="btn primary fit-h" onClick={() => answerPace(true)}>Use {pace.speed.toFixed(1)}</button>
+          </div>
+        </div>
+      )}
 
       {travelDays.map(d => <TravelCard key={d} state={state} date={d} />)}
       <HeavyGuardCard state={state} />

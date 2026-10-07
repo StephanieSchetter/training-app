@@ -182,7 +182,7 @@ function TimeTrial({ state, run, closeBtn }: { state: AppState; run: RunLog; clo
           <div className="line"><span>Threshold</span><span><b>{res.threshold.toFixed(1)}</b> <span className="muted small">was {before.threshold} · {diff(res.threshold, before.threshold)}</span></span></div>
           <div className="line"><span>Strides</span><span><b>{res.strides.toFixed(1)}</b> <span className="muted small">was {before.strides} · {diff(res.strides, before.strides)}</span></span></div>
         </div>
-        <p className="lead small">Easy-run pace stays on the plan for now. Warm-up, recoveries and cool-down speeds never change.</p>
+        <p className="lead small">Easy-run pace doesn't jump. From here it can rise in 0.2 km/h steps, up to {res.easy.toFixed(1)} km/h, when your heart rate on easy runs supports it. Warm-up, recoveries and cool-down speeds never change.</p>
       </main>
       <Dock>
         <button className="btn primary" onClick={() => patch(run.id, (r, s) => {
@@ -192,7 +192,9 @@ function TimeTrial({ state, run, closeBtn }: { state: AppState; run: RunLog; clo
           if (r.practice) return;
           r.speedBefore = before.intervals;
           r.speedAfter = res.intervals;
-          s.speeds = { intervals: res.intervals, threshold: res.threshold, strides: res.strides };
+          // Easy pace doesn't jump on a time trial: the trial only sets its ceiling (agreed rule, 8 Oct 2026).
+          const kept = s.speeds?.easy !== undefined ? Math.min(s.speeds.easy, res.easy) : undefined;
+          s.speeds = { intervals: res.intervals, threshold: res.threshold, strides: res.strides, easyCeiling: res.easy, easy: kept };
           const slot = s.schedule.find(z => z.idx === r.slotIdx);
           if (slot) slot.done = true;
           s.activeRunId = null;

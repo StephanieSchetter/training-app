@@ -4,6 +4,7 @@ import { GymProfile } from './weights';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
 import { matchActivity, matchLaps } from './garmin';
+import { easyCeiling, easyPaceSuggestion } from './running';
 import { adjustSpeed, mmss, readinessSuggestion, repSeconds, restingHrAlert, timeTrialReset } from './running';
 
 const adelaide: GymProfile = { id: 'adelaide', name: 'Adelaide', dumbbellStep: 2.5, smallestPlate: 1.25, kettlebells: [8, 12, 16, 20, 24], machineSteps: { leg_curl: 5 } };
@@ -154,6 +155,18 @@ describe('running', () => {
     expect(r.speedDelta).toBe(-0.3);
     expect(r.replaceWith).toBeUndefined();
     expect(readinessSuggestion(20, 'easy').replaceWith).toBe('easy-30');
+  });
+
+  it('easy pace after a time trial: ceiling, and moves by heart rate', () => {
+    expect(easyCeiling(21 * 60)).toBe(11.0);
+    expect(easyPaceSuggestion(10.2, 11.0, [144, 141, 145])).toEqual({ speed: 10.4, why: 'up' });
+    expect(easyPaceSuggestion(10.2, 11.0, [144, 146, 145])).toBeNull();
+    expect(easyPaceSuggestion(10.2, 11.0, [140, 141])).toBeNull();
+    expect(easyPaceSuggestion(10.2, 11.0, [140, 153, 141])).toEqual({ speed: 10.0, why: 'down' });
+    expect(easyPaceSuggestion(10.9, 11.0, [140, 140, 140])).toEqual({ speed: 11.0, why: 'up' });
+    expect(easyPaceSuggestion(11.0, 11.0, [140, 140, 140])).toBeNull();
+    // only the three most recent count
+    expect(easyPaceSuggestion(10.2, 11.0, [155, 140, 141, 142])).toEqual({ speed: 10.4, why: 'up' });
   });
 
   it('1 km at 13.8 takes 4:21', () => {

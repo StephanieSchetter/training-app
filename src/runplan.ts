@@ -30,6 +30,12 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
   sp.intervals = r1(sp.intervals + d);
   sp.threshold = r1(sp.threshold + d);
   const w = structuredClone(base);
+  // An accepted easy-pace change replaces the plan's easy speed (the deload week never goes above the plan).
+  if (speeds?.easy !== undefined) {
+    const easy = week === 8 ? Math.min(base.easy.speed, speeds.easy) : speeds.easy;
+    w.easy.speed = easy;
+    if ('easyKm' in w.threshold) w.threshold.speed = easy;
+  }
   w.easy.speed = r1(w.easy.speed + d);
   if ('easyKm' in w.threshold) w.threshold.speed = r1(w.threshold.speed + d);
   else if (adjust?.fewerReps) w.threshold.reps = Math.max(1, w.threshold.reps - adjust.fewerReps);
@@ -57,7 +63,8 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
   };
 
   if (adjust?.easy30) {
-    easyRun('30 min', kmFor(30, base.easy.speed), base.easy.speed, false, 30);
+    const easy = speeds?.easy ?? base.easy.speed;
+    easyRun('30 min', kmFor(30, easy), easy, false, 30);
   } else if (type === 'easy') {
     easyRun(`${w.easy.min} min`, kmFor(w.easy.min, w.easy.speed), w.easy.speed, w.easy.strides, w.easy.min);
   } else if (type === 'intervals') {
