@@ -5,7 +5,7 @@ import { schemeText } from './Gym';
 import { buildPlan } from './plan';
 import { buildRun } from './runplan';
 import { AppState, currentSpeeds, gymForDate, Program, RunType, SessionLog, setProgram, today, update } from './store';
-import { syncNow, SyncView, waitingTooLong } from './sync';
+import { APP_VERSION, syncNow, SyncView, waitingTooLong } from './sync';
 import { AppBar, Dock, Icon, Sheet } from './ui';
 
 export const NAMES: Record<string, string> = {
@@ -300,7 +300,16 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
         <button className="btn" onClick={() => syncNow()}>Upload now</button>
       </div>
 
-      <p className="lead small">Gym equipment, rest times, Garmin, body weight and export will appear here as each part is finished.</p>
+      <h2>Garmin</h2>
+      <div className="card">
+        <div className="row"><span>Last successful sync</span><b>{state.garminStatus?.lastSync ? new Date(state.garminStatus.lastSync).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'Not yet'}</b></div>
+        <div className="row"><span>Days of data</span><b>{Object.keys(state.garminDays).length}</b></div>
+        <div className="row"><span>Runs and gym sessions</span><b>{state.garminActs.length}</b></div>
+        {state.garminStatus && !state.garminStatus.ok && <div className="notice">The last attempt didn't work. The app keeps working; it will try again tomorrow morning.</div>}
+      </div>
+
+      <p className="lead small">Gym equipment, rest times, body weight and export will appear here as each part is finished.</p>
+      <p className="lead small">App version {APP_VERSION}</p>
 
       {incoming && (
         <Sheet title={`Load Block ${incoming.block}?`} onClose={() => setIncoming(null)}>

@@ -16,7 +16,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
-const READS_VERSION = 2;
+const READS_VERSION = 3;
+/** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
+export const APP_VERSION = 9;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -129,7 +131,7 @@ function pendingNow(): Pending {
   const deletes = Object.keys(disk.pushed).filter(k => !local.has(k)).map(k => {
     const i = k.indexOf('/');
     return { kind: k.slice(0, i), id: k.slice(i + 1) };
-  });
+  }).filter(ownedByPhone);
   return { upserts, deletes };
 }
 
@@ -221,6 +223,11 @@ export async function initSync() {
   // When a new version of the app understands more kinds of record (e.g. Garmin data), download
   // everything once more so nothing an older version skipped stays missing. Raise the number to trigger it.
   if (disk.reads !== READS_VERSION) { disk.lastPull = null; disk.reads = READS_VERSION; }
+  // An early version tracked records it doesn't own (Garmin data) and then tried to delete them. Forget those.
+  for (const k of Object.keys(disk.pushed)) {
+    const i = k.indexOf('/');
+    if (!ownedByPhone({ kind: k.slice(0, i), id: k.slice(i + 1) })) { delete disk.pushed[k]; delete disk.since[k]; }
+  }
   subscribe(() => { refreshCount(); schedule(1500); });
   if (LOCAL_ONLY) return;
   window.addEventListener('online', () => schedule(200));

@@ -89,12 +89,14 @@ def main():
         return 1
     user_id = owner[0]["user_id"]
     previous = db_get({"select": "data", "kind": "eq.meta", "id": "eq.garmin_status", "user_id": f"eq.{user_id}"})
-    status = previous[0]["data"] if previous else {}
+    status = (previous[0]["data"] or {}) if previous else {}
     now = datetime.now(timezone.utc).isoformat()
 
     try:
         saved = db_get({"select": "data", "kind": "eq.secret", "id": "eq.garmin_tokens", "user_id": f"eq.{user_id}"})
-        tokens = saved[0]["data"]["json"] if saved else os.environ.get("GARMIN_TOKENS", "").strip()
+        # Prefer the refreshed token kept in the database; fall back to the one stored in GitHub.
+        tokens = (saved[0]["data"] or {}).get("json") if saved else None
+        tokens = tokens or os.environ.get("GARMIN_TOKENS", "").strip()
         if not tokens:
             raise RuntimeError("no Garmin sign-in token available")
         g = Garmin()
