@@ -166,6 +166,11 @@ input:focus, textarea:focus { border-color: var(--accent); }
 
 .stats.four { grid-template-columns: repeat(4, 1fr); } .stats.four > div { padding: 12px 8px; } .stats.four b { font-size: 17px; } .stats.four .overline { font-size: 10px; letter-spacing: .04em; }
 .alert-card { border-color: var(--warn); }
+.roster { gap: 10px; }
+.roster-chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.roster-chips button { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-height: 52px; padding: 8px 12px; border-radius: 12px; background: var(--raised); border: 1px solid var(--line); text-align: left; }
+.roster-chips button span { font-size: 12px; color: var(--muted); }
+.roster-chips button.on { background: var(--text); color: var(--bg); border-color: transparent; } .roster-chips button.on span { color: inherit; opacity: .7; }
 .type.stretch { background: var(--raised); color: var(--text); }
 .sub-head { margin: 0 -8px; } .sub-head h1 { font-size: 22px; text-align: center; }
 .line.col { flex-direction: column; align-items: stretch; gap: 8px; }

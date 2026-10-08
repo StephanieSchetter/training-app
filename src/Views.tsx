@@ -279,6 +279,8 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
   const [month, setMonth] = useState(t.slice(0, 7));
   const [picked, setPicked] = useState(t);
   const [sheet, setSheet] = useState<'shift' | 'stint' | null>(null);
+  /** Roster mode: the shift being filled in ('clear' removes one), or null when off. */
+  const [paint, setPaint] = useState<string | null>(null);
   const [draft, setDraft] = useState({ location: 'Port Hedland', start: t, end: t });
   const shiftOf = (d: string) => SHIFTS.find(x => x.id === state.days[d]);
   const first = `${month}-01`;
@@ -309,6 +311,23 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
         <button className="icon-btn" aria-label="Next month" onClick={() => shiftMonth(1)}><Icon name="right" /></button>
       </div>
 
+      {paint === null ? (
+        <button className="btn slim" onClick={() => setPaint('early')}>Fill in my shifts</button>
+      ) : (
+        <div className="card roster">
+          <div className="row"><b>Pick a shift, then tap each day it applies to</b><button className="link" onClick={() => setPaint(null)}>Done</button></div>
+          <div className="roster-chips">
+            {SHIFTS.filter(x => !x.id.startsWith('travel')).map(x => (
+              <button key={x.id} className={paint === x.id ? 'on' : ''} aria-pressed={paint === x.id} onClick={() => setPaint(x.id)}>
+                <b>{x.label}</b><span>{x.hours}</span>
+              </button>
+            ))}
+            <button className={paint === 'clear' ? 'on' : ''} aria-pressed={paint === 'clear'} onClick={() => setPaint('clear')}><b>Clear</b><span>Remove a shift</span></button>
+          </div>
+          <div className="muted small">Travel days are set one at a time: tap Done, then tap the day.</div>
+        </div>
+      )}
+
       <div className="cal">
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <div className="cal-head" key={i}>{d}</div>)}
         {weeks.map(d => {
@@ -317,7 +336,12 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
           return (
             <button key={d} aria-label={niceDate(d, true)}
               className={'cal-day' + (d.slice(0, 7) !== month ? ' out' : '') + (inStint(d) ? ' fifo' : '') + (d === t ? ' today' : '') + (d === picked ? ' picked' : '')}
-              onClick={() => setPicked(d)}>
+              onClick={() => {
+                setPicked(d);
+                // Roster mode: one tap per day sets the chosen shift.
+                if (paint === 'clear') update(s => { delete s.days[d]; });
+                else if (paint) update(s => { s.days[d] = paint; });
+              }}>
               <span className="cal-num">{Number(d.slice(8))}</span>
               {sl.map(s => <span key={s.idx} className={'chip ' + (isGym(s.type) ? 'gym' : 'run') + (s.done ? ' done' : '')}>{SHORT[s.type]}</span>)}
               {ex.length > 0 && <span className="chip practice">P</span>}
