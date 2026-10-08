@@ -292,6 +292,14 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       }
     }
 
+    // A starting weight set in the program replaces "find your load" the first time the lift is done.
+    // It is only a pre-fill: whatever is actually logged is what progression works from.
+    if (item.startWeight != null && !swapped && !past.length && equip !== 'bodyweight' && targets.length && targets.every(t => t.weight === null)) {
+      const w = roundNearest(item.startWeight, equip, gym, ex);
+      targets = scheme.t === 'rpt' ? rptSets(w, targets.map(t => t.reps), targets[0].reps, ctx()) : targets.map(t => ({ ...t, weight: w }));
+      reason = 'Starting weight from your program';
+    }
+
     // Week 8: half the sets at week 7's weights; nothing here feeds progression.
     if (deload && scheme.t !== 'pullup') {
       const last = usableHistory(history, ctx()).at(-1);

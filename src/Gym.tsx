@@ -500,7 +500,11 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const carried = item.scheme.t === 'rpt' && topToday !== null
     ? roundNearest(topToday * Math.pow(0.9, round), item.equip, gym, item.ex)
     : prevThisSession?.weight ?? null;
-  const [weight, setWeight] = useState<number | null>(done ? done.weight : target.weight ?? carried);
+  // If the first set today was logged at a different weight from the suggestion (a manual override),
+  // the remaining sets follow what was actually lifted instead of going back to the suggestion.
+  const firstToday = sets.find(s => s.exId === item.ex && s.setNo === 1 && !s.rampUp && !s.extra);
+  const overridden = !!firstToday && item.targets[0].weight !== null && firstToday.weight !== item.targets[0].weight;
+  const [weight, setWeight] = useState<number | null>(done ? done.weight : overridden ? carried : target.weight ?? carried);
   const [reps, setReps] = useState(done ? done.reps : target.reps);
   const [rir, setRir] = useState<number | null>(done ? done.rir : null);
   const [controlled, setControlled] = useState(done ? !!done.controlled : false);

@@ -31,6 +31,8 @@ export interface ProgramItem {
   byWeek?: { weeks: number[]; scheme?: Scheme; rir?: string }[];
   /** A warm-up exercise: logged, but never counted in sets, progression or charts. */
   warmup?: boolean;
+  /** Weight to pre-fill the first time this lift is done (otherwise week 1 is "find your load"). */
+  startWeight?: number;
 }
 export interface Program {
   block: number; start: string; weeks: number;

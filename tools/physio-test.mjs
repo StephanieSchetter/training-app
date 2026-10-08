@@ -101,6 +101,34 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   await b.close();
 }
 
+// Deadlift starts at 70 kg, and a manual bump in week 2 carries through to week 3
+{
+  const a = await fresh('2026-10-15');
+  await a.click('Start Gym C');
+  const t = (await a.text()).split("TODAY'S EXERCISES")[1];
+  check('Deadlift week 1 is pre-filled at 70 kg', /Conventional Deadlift\s*3 × 8 · RIR 4\+\s*70 kg/.test(t), t.slice(0, 160));
+  await a.close();
+  const wk2 = await fresh('2026-10-16', [wk1C({}, dl(70))]);
+  check('After 70 kg × 8 × 3 with the check OK, week 2 suggests 75 kg', /Conventional Deadlift\s*3 × 8 · RIR 4\+\s*75 kg/.test(await wk2.plan(22, 'Gym C')));
+  await wk2.close();
+  const bumped = await fresh('2026-10-23', [wk1C({}, dl(70)), { id: 'c2', type: 'gymC', date: '2026-10-22', week: 2, daysAgo: 2, sets: dl(80).map(s => [...s, { suggestedWeight: 75 }]), check: {} }]);
+  const t3 = await bumped.plan(29, 'Gym C');
+  check('Manual bump to 80 kg in week 2 (suggestion was 75): week 3 builds from 80 -> top set 85 kg', /Conventional Deadlift\s*3 sets · 6 \/ 8 \/ 10 · RIR 3\s*85 kg/.test(t3), t3.slice(0, 200));
+  check('The logged sets keep both the suggested and the actual weight', (await bumped.page.evaluate(() => window.__dev.getState().sets.filter(s => s.sessionId === 'c2').map(s => `${s.suggestedWeight}/${s.weight}`).join())) === '75/80,75/80,75/80');
+  await bumped.close();
+  // and on the set screen itself: change the pre-filled weight, log it, and the next set follows it
+  const live = await fresh('2026-10-22', [wk1C({}, dl(70))], () => window.__dev.update(s => { s.profiles.find(p => p.id === 'fifo').smallestPlate = 2.5; }));
+  await live.click('Start Gym C'); await live.click('Start warm-up'); await live.click('Start lifting');
+  await live.click('Done'); await live.click('Done'); await live.click('Skip'); await live.click('Next exercise');
+  const before = await live.page.evaluate(() => document.querySelector('.stepper input')?.value);
+  await live.click('More Weight');
+  await live.click('Done'); await live.click('Skip');
+  const logged = await live.page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'deadlift' && s.sessionId !== 'c1').map(s => `${s.suggestedWeight}/${s.weight}`).join());
+  const next = await live.page.evaluate(() => document.querySelector('.stepper input')?.value);
+  check('On the set screen: suggestion 75, bumped to 80 with one tap, logged as 80, next set pre-fills 80', before === '75' && logged === '75/80' && next === '80', `${before} | ${logged} | ${next}`);
+  await live.close();
+}
+
 // 3 and 4. Friday and Sunday order and pairs
 {
   const a = await fresh('2026-10-16');
