@@ -5,7 +5,7 @@ import { matchActivity, matchLaps, Rep } from './engine/garmin';
 import { schemeText } from './Gym';
 import { ReadinessCard } from './Gym';
 import { applyDoubleUp, heavyBeforeIntervals, shiftFrom, travelOptions } from './engine/schedule';
-import { autoSwaps, buildPlan } from './plan';
+import { autoSwaps, buildPlan, leftOut } from './plan';
 import { buildRun, runAdjustFor } from './runplan';
 import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, SHIFTS, today, update, VIEW_ONLY } from './store';
 import { AppBar, Dock, Icon, Sheet } from './ui';
@@ -192,13 +192,13 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
             return (
               <div className="line top" key={p.ex}>
                 <div className="grow">
-                  <div>{p.pair ? <span className="tag">{p.pair}</span> : null}{p.info.name}</div>
+                  <div>{p.pair ? <span className="tag">{p.pair}</span> : null}{p.warmup ? <span className="tag">Warm-up</span> : null}{logged ? p.info.name : p.title}</div>
                   {p.swapLabel && <div className="small warn-text">{p.swapLabel}</div>}
                   {logged
                     ? (done.length
                       ? done.map(s => <div className="muted small tab" key={s.id}>Set {s.setNo}{s.side ? ` ${s.side}` : ''}: {s.weight != null ? `${s.weight} kg × ` : ''}{s.reps}{s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}</div>)
                       : <div className="muted small">Not done</div>)
-                    : <div className="muted small">{schemeText(p)}</div>}
+                    : <div className="muted small">{schemeText(p)}{p.rir !== program.rirByWeek[week] ? ` · RIR ${p.rir}` : ''}{p.reason && p.reason.startsWith('Held') ? ` · ${p.reason}` : ''}</div>}
                 </div>
                 {!logged && <div className="muted nowrap right">{p.usesWeight ? (p.targets[0]?.weight != null ? `${p.targets[0].weight} kg` : 'Find load') : 'Bodyweight'}</div>}
                 {logged && done.length > 0 && <span className="ok"><Icon name="check" size={18} /></span>}
@@ -206,6 +206,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
             );
           })}
         </div>
+        {!logged && leftOut(state, session).length > 0 && <div className="card muted">Left out this week (back flare): {leftOut(state, session).join(', ')}.</div>}
         {logged?.notes && <><h2>Note</h2><div className="card">{logged.notes}</div></>}
         {logged && <GarminCard state={state} date={logged.date} type="strength" startedAt={logged.startedAt} />}
 

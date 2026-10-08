@@ -135,6 +135,28 @@ export function legRaiseLevelUp(sets: { reps: number; controlled: boolean }[], t
   return sets.filter(s => s.reps >= targetReps && s.controlled).length >= 3;
 }
 
+/**
+ * 45° back extension (physio, Oct 2026): ready for load once every set hit the top of the range AND
+ * felt easy, meaning RIR 3 or 4+ was logged on each. rir: 0-3 as tapped, 4 for "4+", null if not tapped.
+ */
+export function backExtensionGoWeighted(sets: { reps: number; rir: number | null }[], setCount: number, topReps: number): boolean {
+  return sets.filter(s => s.reps >= topReps && s.rir !== null && s.rir >= 3).length >= setCount;
+}
+
+/**
+ * 45° lateral bend: up a stage only at the top of the range on every set, both sides, each ticked
+ * "controlled". A stage is a bigger jump than a weight step, so the bar is the top of the range.
+ */
+export function lateralBendStageUp(sets: { setNo: number; side?: 'L' | 'R'; reps: number; controlled: boolean }[], setCount: number, topReps: number): boolean {
+  for (let n = 1; n <= setCount; n++) {
+    for (const side of ['L', 'R'] as const) {
+      const s = sets.find(x => x.setNo === n && x.side === side);
+      if (!s || s.reps < topReps || !s.controlled) return false;
+    }
+  }
+  return true;
+}
+
 /** Dips: bodyweight until 4 x 10. */
 export function dipsGoWeighted(reps: number[]): boolean {
   return reps.filter(r => r >= 10).length >= 4;

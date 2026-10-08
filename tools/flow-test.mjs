@@ -141,24 +141,28 @@ async function fresh(date, { catchUp = false, setup } = {}) {
     const at = Date.now() - 86400000;
     s.sessions.push({ id: 'c1', slotIdx: slot.idx, type: 'gymC', date: '2026-10-15', gymId: 'fifo', week: 1, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
     const set = (id, exId, setNo, weight, reps, side) => s.sets.push({ id, sessionId: 'c1', exId, plannedExId: exId, setNo, side, weight, reps, rir: 3, suggestedWeight: null, suggestedReps: reps, ts: at });
-    set('d1', 'deadlift', 1, 100, 6); set('d2', 'deadlift', 2, 90, 8); set('d3', 'deadlift', 3, 80, 10);
+    set('d1', 'deadlift', 1, 60, 8); set('d2', 'deadlift', 2, 60, 8); set('d3', 'deadlift', 3, 60, 8);
     set('b1', 'db_bench', 1, 30, 6);
-    set('s1', 'suitcase_carry', 1, 30, 30, 'L'); set('s2', 'suitcase_carry', 1, 30, 30, 'R');
   }) });
   check('14: morning check-in is asked after Gym C', /morning check-in · after gym c/i.test(await a.text()));
   await a.click('Worse', 1); // second row = back
   await a.shot('checkin');
   await a.click('Save check-in');
   const t = await a.text();
-  check('14: proposes 10% lighter on the back-tagged lifts only', t.includes('Go 10% lighter next time') && t.includes('Conventional Deadlift, Suitcase Carry') && !t.includes('Flat Dumbbell Bench Press,'), t.split('Go 10% lighter')[1]);
-  check('14: offers the back-flare swap for the week', t.includes('Swap deadlift and single-leg RDL for 45° back extension'));
+  check('14: proposes 10% lighter on the back-tagged lifts only', t.includes('Go 10% lighter next time') && /these lifts\s*Conventional Deadlift\s*No thanks/.test(t), t.split('Go 10% lighter')[1]);
+  check('14: offers the back-flare week', t.includes('Ease off for a back-flare week') && t.includes('kettlebell swings are left out'));
   await a.shot('checkin-offers');
-  await a.click('Go lighter'); await a.click('Swap them');
+  await a.click('Go lighter'); await a.click('Ease off');
+  await a.click('Start Gym A');
+  const fri = await a.text();
+  check('14: back-flare week, Friday leaves out kettlebell swings', /Kettlebell Swing[\s\S]{0,40}Left out this week/.test(fri) && !fri.split("TODAY'S EXERCISES")[1].includes('Kettlebell Swing'), fri.split('SWAPS AT THIS GYM')[1]);
+  await a.click('Leave session');
   await a.click('Calendar'); await a.day(18); await a.click('Gym D');
-  check('14: this week\'s Gym D now shows the back extension', (await a.text()).includes('Swapped from Single-Leg Romanian Deadlift'));
+  const sun = await a.text();
+  check('14: back-flare week, Sunday leaves out single-leg RDL and keeps the back extension pair', sun.includes('Left out this week (back flare): Single-Leg Romanian Deadlift') && !sun.split('THE PLAN')[1].split('Left out this week')[0].includes('Single-Leg Romanian') && sun.includes('45° Back Extension'), sun.split('THE PLAN')[1]);
   await a.click('Back'); await a.day(22); await a.click('Gym C');
   const c = await a.text();
-  check('14: next Gym C has deadlift back, 10% lighter (100 -> 90 kg)', /Conventional Deadlift[\s\S]{0,40}90 kg/.test(c) && !c.includes('Swapped from Conventional'), c.split('THE PLAN')[1]);
+  check('14: next Gym C has deadlift back at 3 x 8, 10% lighter (60 -> 55 kg), not swapped', /Conventional Deadlift[\s\S]{0,60}55 kg/.test(c) && c.includes('3 × 8') && !c.includes('Swapped from Conventional'), c.split('THE PLAN')[1]);
   check('14: bench (not back-tagged) is unchanged at 30 kg', /Flat Dumbbell Bench Press[\s\S]{0,40}30 kg/.test(c));
   await a.close();
 }

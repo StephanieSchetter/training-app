@@ -1,11 +1,12 @@
 // Turns the program + logged history into what the gym screens show for one session.
 import type { Equip, GymProfile } from './engine/weights';
-import { gridStep, roundNearest } from './engine/weights';
+import { gridStep, oneStepUp, roundNearest } from './engine/weights';
 import {
-  deloadSetCount, dipsGoWeighted, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
+  backExtensionGoWeighted, deloadSetCount, dipsGoWeighted, lateralBendStageUp, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
   PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
 } from './engine/progression';
-import type { AppState, Exercise, Scheme, SessionLog, SetLog } from './store';
+import { DROP } from './store';
+import type { AppState, Exercise, ProgramItem, Scheme, SessionLog, SetLog } from './store';
 
 export interface PlanItem {
   plannedEx: string;
@@ -30,6 +31,39 @@ export interface PlanItem {
   assist?: string;
   /** Extra reps in reserve on top sets today, from an accepted readiness suggestion. */
   rirExtra: number;
+  /** RIR target for this exercise this week (the week's default unless the program overrides it). */
+  rir: string;
+  /** A warm-up exercise: never counted in sets or progression. */
+  warmup: boolean;
+}
+
+export const LATERAL_BEND_STAGES = ['Hands by sides', 'Hands crossed over chest', 'Hands above head'];
+
+/** The scheme an exercise uses in a given week (the graded deadlift return changes by week). */
+function schemeIn(item: ProgramItem, week: number): Scheme {
+  return item.byWeek?.find(b => b.weeks.includes(week))?.scheme ?? item.scheme;
+}
+
+/** True when Brad accepted the back-flare changes for this training week. */
+export function flareWeek(state: AppState, week: number): boolean {
+  return state.tempSwaps.some(t => t.kind === 'back-flare' && t.week === week);
+}
+
+/** True for a session done under the back-flare changes: in a flare week, after the flare was accepted. */
+function easedOff(state: AppState, s: SessionLog): boolean {
+  return state.tempSwaps.some(t => t.kind === 'back-flare' && t.week === s.week && s.startedAt >= t.createdAt);
+}
+
+/** The morning check after a session: 'worse' if knee or back was worse, 'none' if it wasn't answered. */
+export function checkAfter(state: AppState, sessionId: string): { any: 'ok' | 'worse' | 'none'; backWorse: boolean } {
+  const c = state.checkins.find(x => x.sessionId === sessionId);
+  if (!c) return { any: 'none', backWorse: false };
+  return { any: c.knee === 'worse' || c.back === 'worse' ? 'worse' : 'ok', backWorse: c.back === 'worse' };
+}
+
+/** Exercises left out of this session by a swap rule (e.g. kettlebell swings in a back-flare week). */
+export function leftOut(state: AppState, session: SessionLog): string[] {
+  return state.program!.sessions[session.type].items.filter(i => session.swaps[i.ex] === DROP).map(i => state.program!.exercises[i.ex].name);
 }
 
 /** Swaps that apply without Brad choosing them: FIFO equipment, a back flare this week, block pulls after a sore knee. */
@@ -97,20 +131,28 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
   const gym: GymProfile = state.profiles.find(p => p.id === session.gymId)!;
   const week = session.week;
   const deload = week === DELOAD_WEEK;
+  const flare = flareWeek(state, week);
+  const everyItem = Object.values(program.sessions).flatMap(s => s.items);
 
-  return program.sessions[session.type].items.map(item => {
+  return program.sessions[session.type].items.filter(item => session.swaps[item.ex] !== DROP).map(item => {
     const ex = session.swaps[item.ex] ?? item.ex;
     const swapped = ex !== item.ex;
     const info = program.exercises[ex];
     const past = pastFor(state, ex, session);
     const history = past.map(p => p.result);
+    const byWeek = item.byWeek?.find(b => b.weeks.includes(week));
     let equip = info.equip;
-    let scheme = item.scheme;
+    let scheme = schemeIn(item, week);
     let title = info.name;
     let level: number | undefined;
     let assist: string | undefined;
-    // A swapped-in bodyweight move keeps the set count but has no weight rules.
-    if (swapped && info.equip === 'bodyweight') scheme = { t: 'log', sets: setCount(item.scheme), reps: 10 };
+    if (swapped) {
+      // A swapped-in exercise that has its own place in the program brings its own scheme (back extension);
+      // any other bodyweight move keeps the set count and has no weight rules.
+      const home = everyItem.find(i => i.ex === ex && !i.warmup);
+      if (home) scheme = schemeIn(home, week);
+      else if (info.equip === 'bodyweight') scheme = { t: 'log', sets: setCount(scheme), reps: 10 };
+    }
 
     let targets: SetTarget[] = [];
     let repsLabel: string[] = [];
@@ -121,6 +163,56 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       case 'rpt': {
         const s = suggestRpt(scheme.reps, history, ctx());
         targets = s.sets; reason = s.reason; repsLabel = scheme.reps.map(String);
+        // First reverse-pyramid week after straight-set weeks (deadlift, week 3): one step up only if
+        // every straight set was completed; either way the top set starts at the bottom of the range.
+        const prev = past.filter(p => !p.result.deload).at(-1);
+        const before = prev && !swapped ? schemeIn(item, prev.session.week) : undefined;
+        if (prev && before && (before.t === 'fixed' || before.t === 'straight') && week > 1) {
+          const need = before.t === 'fixed' ? before.reps : before.range[1];
+          const earned = prev.result.reps.length >= before.sets && prev.result.reps.every(r => r >= need);
+          const top = earned ? oneStepUp(prev.result.weight, equip, gym, ex) : roundNearest(prev.result.weight, equip, gym, ex);
+          targets = rptSets(top, scheme.reps, scheme.reps[0], ctx());
+          reason = earned ? 'All straight sets done: one step up, now reverse pyramid' : 'Same weight, now reverse pyramid';
+        }
+        break;
+      }
+      case 'bwload': {
+        const sets = scheme.sets;
+        const top = scheme.range[1];
+        const steady = past.filter(p => !easedOff(state, p.session));
+        const loaded = steady.filter(p => p.sets.some(s => s.weight));
+        const ready = loaded.length > 0 || steady.some(p => backExtensionGoWeighted(p.sets.filter(s => !s.rampUp && !s.extra).map(s => ({ reps: s.reps, rir: s.rir })), sets, top));
+        let weight: number | null = null;
+        if (flare) {
+          // Back-flare week: bodyweight, or the last load that wasn't followed by a "back worse" morning.
+          const calm = [...past].reverse().find(p => !checkAfter(state, p.session.id).backWorse);
+          weight = calm?.sets.find(s => s.setNo === 1 && !s.rampUp && !s.extra)?.weight || null;
+          reason = 'Back-flare week: no increase';
+        } else if (ready) {
+          const s = suggestStraight(sets, scheme.range, loaded.map(p => p.result), { exId: ex, equip: 'added', gym, week: Math.max(week, 2) });
+          weight = loaded.length ? s.sets[0].weight : 2.5;
+          reason = loaded.length ? s.reason : '3 × 12 felt easy: now holding a plate';
+        }
+        if (weight) { equip = 'added'; title = `${info.name} (weighted)`; }
+        targets = Array.from({ length: sets }, () => ({ weight, reps: scheme.range[0] }));
+        repsLabel = targets.map(() => range((scheme as { range: [number, number] }).range));
+        break;
+      }
+      case 'stage': {
+        const names = program.lateralBendStages ?? LATERAL_BEND_STAGES;
+        const sc = scheme;
+        let stage = 1;
+        for (const p of past) {
+          if (easedOff(state, p.session)) continue; // an eased-off session never counts towards moving up
+          const at: number = p.sets[0]?.level ?? stage;
+          const rows = p.sets.filter(s => !s.rampUp && !s.extra).map(s => ({ setNo: s.setNo, side: s.side, reps: s.reps, controlled: !!s.controlled }));
+          if (at === stage && stage < names.length && lateralBendStageUp(rows, sc.sets, sc.range[1])) stage++;
+        }
+        level = flare ? Math.max(1, stage - 1) : stage;
+        title = `${info.name} · Stage ${level}: ${names[level - 1]}`;
+        targets = Array.from({ length: sc.sets }, () => ({ weight: null, reps: sc.range[0] }));
+        repsLabel = targets.map(() => range(sc.range));
+        reason = flare && stage > 1 ? 'Back-flare week: one stage easier' : '';
         break;
       }
       case 'straight': case 'fixed': case 'log': {
@@ -213,6 +305,19 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       reason = 'Deload: week 7 weights, half the sets';
     }
 
+    // Morning check (physio, Oct 2026): "worse" after the last session with this main lift holds its weight
+    // next time. Deadlift is stricter: no answered check-in also holds.
+    const lastTime = past.at(-1);
+    const isDeadlift = ex === 'deadlift' || ex === 'block_pull';
+    if (!deload && item.scheme.t === 'rpt' && lastTime && targets[0]?.weight != null) {
+      const check = checkAfter(state, lastTime.session.id).any;
+      const held = roundNearest(lastTime.result.weight, equip, gym, ex);
+      if ((check === 'worse' || (isDeadlift && check === 'none')) && targets[0].weight > held) {
+        targets = scheme.t === 'rpt' ? rptSets(held, targets.map(t => t.reps), targets[0].reps, ctx()) : targets.map(t => ({ ...t, weight: held }));
+        reason = check === 'worse' ? 'Held: knee or back was worse the next morning' : 'Held: no morning check-in after the last deadlift session';
+      }
+    }
+
     // Next-morning rule (6.7): a confirmed "10% lighter next time" applies until this lift is next logged.
     const reduction = deload ? undefined : state.reductions.find(r => r.exId === ex && !past.some(p => p.session.startedAt > r.createdAt));
     if (reduction && targets[0]?.weight != null) {
@@ -246,6 +351,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       equip, usesWeight, targets, repsLabel, reason,
       rest: state.restOverrides[ex] ?? (isMain ? 180 : 90),
       isMain, setup, level, assist, rirExtra,
+      rir: byWeek?.rir ?? program.rirByWeek[week], warmup: !!item.warmup,
     };
   });
 }

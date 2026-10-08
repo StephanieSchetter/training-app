@@ -1,10 +1,22 @@
-// Evening stretch (spec 5.8): six stretches, 45 seconds each side, logged done / not done per day.
+// Evening mobility routine (spec 5.8, updated after the physio review of 8 Oct 2026): the
+// physio-prescribed movements first, then the stretches. Ticked off per day, with a weekly count
+// against the 4–5 sessions target.
 import { useEffect, useRef, useState } from 'react';
+import { addDays } from './engine/schedule';
 import { useWakeLock } from './Gym';
 import { AppState, today, update } from './store';
 import { AppBar, Dock, Icon } from './ui';
 
 const HOLD = 45;
+
+/** Days this week (Monday to Sunday) on which the whole routine was ticked off. */
+export function mobilityThisWeek(state: AppState, t: string): number {
+  const monday = addDays(t, -((new Date(t + 'T00:00:00Z').getUTCDay() + 6) % 7));
+  const all = state.program!.stretches.length;
+  return Array.from({ length: 7 }, (_, i) => addDays(monday, i)).filter(d => (state.stretch[d] ?? []).length >= all).length;
+}
+
+export const mobilityTargetText = (state: AppState) => (state.program!.mobilityTarget ?? [4, 5]).join('–');
 
 export function Stretch({ state, onBack }: { state: AppState; onBack: () => void }) {
   const t = today();
@@ -30,24 +42,43 @@ export function Stretch({ state, onBack }: { state: AppState; onBack: () => void
     const cur = s.stretch[t] ?? [];
     s.stretch[t] = cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i];
   });
+  const week = mobilityThisWeek(state, t);
+  const groups = [
+    { title: 'Physio-prescribed · do these first', items: list.map((s, i) => ({ s, i })).filter(x => x.s.physio) },
+    { title: list.some(s => s.physio) ? 'Then' : 'Stretches', items: list.map((s, i) => ({ s, i })).filter(x => !x.s.physio) },
+  ].filter(g => g.items.length);
 
   return (
     <div className="screen">
-      <AppBar title="Evening stretch" sub={`${done.length} of ${list.length} done · about 8 min`}
+      <AppBar title="Evening mobility" sub={`${done.length} of ${list.length} done today`}
         left={<button className="icon-btn" aria-label="Back" onClick={onBack}><Icon name="left" /></button>} />
       <div className="segs">{list.map((_, i) => <span key={i} className={done.includes(i) ? 'full' : ''} />)}</div>
       <main className="page">
-        <p className="lead">Hold each for 45 seconds, both sides evenly. Use the timer for each side, then tick the stretch off.</p>
-        {list.map((s, i) => {
-          const on = done.includes(i);
-          return (
-            <button key={s.name} className={'check' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggle(i)}>
-              <span className="circle">{on && <Icon name="check" size={18} />}</span>
-              <span className="check-body"><b>{s.name}</b><span className="small muted">{s.why}</span></span>
-            </button>
-          );
-        })}
-        {done.length === list.length && <div className="card done-card"><span className="ok big-ok"><Icon name="check" size={30} /></span><div><b>All six done. Nice work.</b><div className="muted small">Logged for today.</div></div></div>}
+        <div className="stats">
+          <div><div className="overline">This week</div><b>{week} session{week === 1 ? '' : 's'}</b></div>
+          <div><div className="overline">Target</div><b>{mobilityTargetText(state)} a week</b></div>
+          <div><div className="overline">Today</div><b>{done.length >= list.length ? 'Done' : `${done.length} of ${list.length}`}</b></div>
+        </div>
+        <p className="lead small">Tick each one off as you finish it. The 45-second timer below is there for the timed holds; the day counts once everything is ticked.</p>
+        {groups.map(g => (
+          <div className="stack" key={g.title}>
+            <h2>{g.title}</h2>
+            {g.items.map(({ s, i }) => {
+              const on = done.includes(i);
+              return (
+                <button key={s.name} className={'check' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggle(i)}>
+                  <span className="circle">{on && <Icon name="check" size={18} />}</span>
+                  <span className="check-body">
+                    <b>{s.name}</b>
+                    {s.dose && <span className="small">{s.dose}</span>}
+                    {s.why && <span className="small muted">{s.why}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+        {done.length === list.length && <div className="card done-card"><span className="ok big-ok"><Icon name="check" size={30} /></span><div><b>Routine done. Nice work.</b><div className="muted small">Logged for today. That's {week} this week.</div></div></div>}
       </main>
       <Dock>
         {left !== null && left > 0 && (

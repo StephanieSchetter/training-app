@@ -37,15 +37,17 @@ await click('Save');
 check('Saving it removes the prompt for the week', !/weekly body weight/i.test(await text()));
 
 // Evening stretch
-await click('Evening stretch');
+await click('Evening mobility');
 await click('Start 45 sec timer');
 await wait(1200);
 const num = await page.evaluate(() => document.querySelector('.timer-num')?.textContent);
 check('Stretch timer counts down from 45', Number(num) <= 45 && Number(num) >= 42, num);
 await shot('stretch');
 await click('Stop');
-for (const s of ['Half-kneeling', 'Seated hamstring', 'Calf against', 'Thread-the-needle', 'Side-lying', "Child's pose"]) await click(s);
-check('Ticking all six logs the day as done', (await text()).includes('All six done'));
+const before = await text();
+check('Mobility routine: physio movements first, then stretches, with the weekly target', /PHYSIO-PRESCRIBED[\s\S]*Prayer stretch[\s\S]*Standing side bend[\s\S]*Lumbar rock[\s\S]*THEN[\s\S]*Half-kneeling hip flexor/i.test(before) && before.includes('4–5 a week') && !before.includes("Child's pose"));
+for (const s of ['Prayer stretch', 'Standing side bend', 'Lumbar rock', 'Half-kneeling', 'Seated hamstring', 'Calf against', 'Thread-the-needle', 'Side-lying']) await click(s);
+check('Ticking all eight logs the day and counts 1 for the week', (await text()).includes('Routine done') && (await text()).includes('1 session'));
 await click('Back');
 check('Home shows the stretch as done for today', (await text()).includes('Done for today'));
 

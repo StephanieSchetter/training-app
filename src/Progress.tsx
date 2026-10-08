@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { LineChart } from './Chart';
 import { addDays } from './engine/schedule';
 import { mmss } from './engine/running';
-import { easyHrSeries, liftChart, liftList, RecoveryKey, recoverySeries, speedSeries, timeTrialSeries, weightSeries } from './stats';
+import { easyHrSeries, heldSince, liftChart, liftList, RecoveryKey, recoverySeries, speedSeries, timeTrialSeries, weightSeries } from './stats';
 import { AppState, today } from './store';
 import { Icon, Segmented } from './ui';
 
@@ -31,11 +31,12 @@ function Lift({ state, exId, name }: { state: AppState; exId: string; name: stri
   const pts = c.series.flatMap(s => s.points);
   const last = c.series[0]?.points.at(-1);
   const fmt = c.kind === 'max' ? (v: number) => `${v} kg` : c.kind === 'percent' ? (v: number) => `${v > 0 ? '+' : ''}${v}%` : c.kind === 'level' ? (v: number) => c.levels[v - 1] ?? String(v) : (v: number) => String(v);
+  const held = heldSince(state, exId);
   const kind = c.kind === 'max' ? 'Estimated max' : c.kind === 'percent' ? 'Change since first session at each gym' : c.kind === 'level' ? 'Level reached' : 'Total reps per session';
   return (
     <div className="lift">
       <button className="line tapline" aria-expanded={open} onClick={() => setOpen(o => !o)}>
-        <div className="grow"><div>{name}</div><div className="muted small">{pts.length ? `${kind} · ${pts.length} session${pts.length === 1 ? '' : 's'}` : 'Not logged yet'}</div></div>
+        <div className="grow"><div>{name}</div><div className="muted small">{pts.length ? `${kind} · ${pts.length} session${pts.length === 1 ? '' : 's'}` : 'Not logged yet'}</div>{held && <div className="small warn-text">Weight held: knee or back was worse on {new Date(held + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>}</div>
         <span className="muted nowrap">{last ? fmt(last.y) : ''}</span>
         <span className="muted"><Icon name={open ? 'minus' : 'plus'} size={18} /></span>
       </button>

@@ -4,8 +4,8 @@ import { gridStep, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
-import { autoSwaps, blocks, buildPlan, lastSet, PlanItem, Step, stepsFor } from './plan';
-import { AppState, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
+import { autoSwaps, blocks, buildPlan, lastSet, leftOut, PlanItem, Step, stepsFor } from './plan';
+import { AppState, DROP, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
 import { AppBar, clock, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
 type Phase = 'start' | 'warmup' | 'lifts' | 'finish';
@@ -129,6 +129,7 @@ export function GymSession({ sessionId }: { sessionId: string }) {
 
   if (phase === 'start') {
     const swapped = plan.filter(p => p.swapLabel);
+    const dropped = leftOut(state, session);
     return (
       <div className="screen">
         <AppBar title={name} sub={sub} left={closeBtn} />
@@ -149,7 +150,7 @@ export function GymSession({ sessionId }: { sessionId: string }) {
               x.warmupOnly = accepted && readinessSuggestion(score, session.type as SessionType).replaceWith === 'warmup-and-stretch' ? true : undefined;
             })} />
 
-          {swapped.length > 0 && (
+          {swapped.length + dropped.length > 0 && (
             <>
               <h2>Swaps at this gym</h2>
               <div className="card list">
@@ -157,6 +158,12 @@ export function GymSession({ sessionId }: { sessionId: string }) {
                   <div className="line" key={p.ex}>
                     <div><div className="strike muted small">{program.exercises[p.plannedEx].name}</div><div>{p.info.name}</div></div>
                     <Icon name="swap" />
+                  </div>
+                ))}
+                {dropped.map(name => (
+                  <div className="line" key={name}>
+                    <div><div className="strike muted small">{name}</div><div>Left out this week (back flare)</div></div>
+                    <Icon name="minus" />
                   </div>
                 ))}
               </div>
@@ -168,8 +175,8 @@ export function GymSession({ sessionId }: { sessionId: string }) {
             {plan.map(p => (
               <div className="line" key={p.ex}>
                 <div>
-                  <div>{p.pair ? <span className="tag">{p.pair}{blocks(plan).find(b => b.includes(p))!.indexOf(p) + 1}</span> : null}{p.info.name}</div>
-                  <div className="muted small">{schemeText(p)}</div>
+                  <div>{p.pair ? <span className="tag">{p.pair}{blocks(plan).find(b => b.includes(p))!.indexOf(p) + 1}</span> : null}{p.warmup ? <span className="tag">Warm-up</span> : null}{p.title}</div>
+                  <div className="muted small">{schemeText(p)}{p.rir !== program.rirByWeek[session.week] ? ` · RIR ${p.rir}` : ''}</div>
                 </div>
                 <div className="muted nowrap">{p.usesWeight ? (p.targets[0]?.weight != null ? fmtKg(p.targets[0].weight) : 'Find load') : 'Bodyweight'}</div>
               </div>
@@ -214,16 +221,18 @@ export function GymSession({ sessionId }: { sessionId: string }) {
   }
 
   if (phase === 'finish') {
-    const work = sets.filter(s => !s.rampUp && !s.extra);
+    // Warm-up exercises (the Thursday back-extension primer) are logged but never counted.
+    const counted = plan.filter(p => !p.warmup);
+    const work = sets.filter(s => !s.rampUp && !s.extra && counted.some(p => p.ex === s.exId));
     const mins = Math.round((Date.now() - session.startedAt) / 60000);
-    const doneEx = plan.filter(p => work.some(s => s.exId === p.ex)).length;
+    const doneEx = counted.filter(p => work.some(s => s.exId === p.ex)).length;
     return (
       <div className="screen">
         <AppBar title="Session summary" sub={name} left={<button className="icon-btn" aria-label="Back to exercises" onClick={() => setPhase('lifts')}><Icon name="left" /></button>} />
         <main className="page">
           <div className="stats">
             <div><div className="overline">Time</div><b>{mins} min</b></div>
-            <div><div className="overline">Exercises</div><b>{doneEx} of {plan.length}</b></div>
+            <div><div className="overline">Exercises</div><b>{doneEx} of {counted.length}</b></div>
             <div><div className="overline">Sets</div><b>{work.length}</b></div>
           </div>
           {session.badDay && <div className="card warn-card"><Icon name="flag" /> Flagged as a bad day. Misses today won't count.</div>}
@@ -397,7 +406,7 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
           <p className="muted">For this session only.</p>
           {swaps.map(sw => (
             <button className="btn option" key={sw.to + sw.when} onClick={() => { patchSession(x => { x.swaps[item.plannedEx] = sw.to; }); setPanel(null); }}>
-              <b>{program.exercises[sw.to].name}</b><span className="small muted">{sw.label}</span>
+              <b>{sw.to === DROP ? 'Leave it out' : program.exercises[sw.to].name}</b><span className="small muted">{sw.label}</span>
             </button>
           ))}
           {session.swaps[item.plannedEx] && <button className="btn" onClick={() => { patchSession(x => { delete x.swaps[item.plannedEx]; }); setPanel(null); }}>Back to {program.exercises[item.plannedEx].name}</button>}
@@ -518,7 +527,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       setNo: rampUp ? 0 : round + 1, side: rampUp ? undefined : side,
       weight: item.usesWeight ? weight : null, reps, rir: rampUp ? null : rir,
       rampUp: rampUp || undefined,
-      controlled: item.scheme.t === 'legraise' ? controlled : undefined,
+      controlled: item.scheme.t === 'legraise' || item.scheme.t === 'stage' ? controlled : undefined,
       assist: item.scheme.t === 'nordic' ? assist : undefined,
       level: item.level,
       suggestedWeight: target.weight, suggestedReps: target.reps, ts: done?.ts ?? Date.now(),
@@ -546,7 +555,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       <div className={'card target-card' + (done ? ' editing' : '')}>
         <div className="row">
           <div className="overline">{done ? 'Editing · ' : ''}Set {round + 1} of {item.targets.length}{side ? ` · ${sideName(side)} side` : ''}</div>
-          <div className="overline">RIR target {state.program!.rirByWeek[session.week]}{item.rirExtra && item.isMain && round === 0 ? ' +1' : ''}</div>
+          <div className="overline">RIR target {item.rir}{item.rirExtra && item.isMain && round === 0 ? ' +1' : ''}</div>
         </div>
         <div className="targ">
           {item.usesWeight ? (findLoad ? 'Find your load' : fmtKg(target.weight)) : 'Bodyweight'}
@@ -569,6 +578,12 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
         <Segmented options={RIRS.map((label, value) => ({ value, label }))} value={rir} onChange={setRir} />
       </div>
 
+      {item.scheme.t === 'stage' && (
+        <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
+          <span className="circle">{controlled && <Icon name="check" size={18} />}</span>
+          <span className="check-body"><b>Controlled</b><span className="small muted">12 reps on every set, both sides, all ticked controlled, moves you up a stage.</span></span>
+        </button>
+      )}
       {item.scheme.t === 'legraise' && (
         <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
           <span className="circle">{controlled && <Icon name="check" size={18} />}</span>

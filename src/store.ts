@@ -12,18 +12,35 @@ export type Scheme =
   | { t: 'pullup' }
   | { t: 'legraise' }
   | { t: 'dips'; sets: number; range: [number, number] }
-  | { t: 'nordic'; sets: number; range: [number, number] };
+  | { t: 'nordic'; sets: number; range: [number, number] }
+  /** Bodyweight until every set hits the top of the range and felt easy (RIR 3+), then loaded in 2.5 kg steps. */
+  | { t: 'bwload'; sets: number; range: [number, number] }
+  /** Progresses by stage (hand position), not weight. */
+  | { t: 'stage'; sets: number; range: [number, number] };
+
+/** In a swap, "leave this exercise out" in place of a replacement. */
+export const DROP = '__drop';
 
 export interface Exercise {
   name: string; equip: Equip; eachSide?: boolean; plateLoaded?: boolean;
   tags?: string[]; main?: string[]; helper?: string[]; note?: string;
 }
-export interface ProgramItem { ex: string; scheme: Scheme; pair?: string; before?: string }
+export interface ProgramItem {
+  ex: string; scheme: Scheme; pair?: string; before?: string;
+  /** A different scheme and/or RIR target in particular weeks (e.g. the graded return to deadlifting). */
+  byWeek?: { weeks: number[]; scheme?: Scheme; rir?: string }[];
+  /** A warm-up exercise: logged, but never counted in sets, progression or charts. */
+  warmup?: boolean;
+}
 export interface Program {
   block: number; start: string; weeks: number;
   rirByWeek: Record<string, string>; weekNotes: Record<string, string>;
   warmup: { name: string; dose: string; how: string }[];
-  stretches: { name: string; why: string }[];
+  /** Evening mobility routine. physio = prescribed by the physio, done first. */
+  stretches: { name: string; why?: string; dose?: string; physio?: boolean }[];
+  /** Mobility sessions to aim for each week, e.g. [4, 5]. */
+  mobilityTarget?: [number, number];
+  lateralBendStages?: string[];
   exercises: Record<string, Exercise>;
   sessions: Record<string, { name: string; note?: string; items: ProgramItem[] }>;
   swaps: { when: string; from: string; to: string; label: string }[];
@@ -88,7 +105,8 @@ export interface Speeds {
 }
 export interface Alert { id: string; kind: 'intervals-slipping' | 'rhr-high' | 'easy-pace'; date: string; status: 'open' | 'accepted' | 'ignored' }
 
-export type Feel = 'better' | 'same' | 'worse';
+/** Morning check answer. 'better' and 'same' are from the first version of the check-in and both mean OK. */
+export type Feel = 'ok' | 'worse' | 'better' | 'same';
 type Offer = 'pending' | 'yes' | 'no';
 /** Morning-after check-in for one gym session, plus what was offered and whether Brad took it. */
 export interface Checkin {

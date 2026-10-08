@@ -4,6 +4,7 @@ import { readinessSuggestion } from './engine/running';
 import { addDays, isGym, shiftFrom, Slot } from './engine/schedule';
 import { startGym } from './Gym';
 import { startPracticeRun } from './Run';
+import { mobilityTargetText, mobilityThisWeek } from './Stretch';
 import { buildRun } from './runplan';
 import { EASY_HR_HIGH, EASY_HR_OK } from './engine/running';
 import { easyPace, trendTiles } from './stats';
@@ -14,7 +15,7 @@ import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from '.
 
 const PRACTICE_FOR_TESTS = import.meta.env.DEV && new URLSearchParams(location.search).has('practice');
 const SHORT: Record<string, string> = { easy: 'Easy', intervals: 'Int', threshold: 'Thr', gymA: 'A', gymB: 'B', gymC: 'C', gymD: 'D' };
-const FEELS: { value: Feel; label: string }[] = [{ value: 'better', label: 'Better' }, { value: 'same', label: 'Same' }, { value: 'worse', label: 'Worse' }];
+const FEELS: { value: Feel; label: string }[] = [{ value: 'ok', label: 'OK' }, { value: 'worse', label: 'Worse' }];
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
 /** One-line description of a planned session, e.g. "5 × 800 m at 13.8 km/h, 2 min recovery". */
@@ -26,10 +27,13 @@ function blurb(state: AppState, s: Slot): string {
 
 /** Morning-after check-in (5.4): two rows, about ten seconds. */
 function CheckinCard({ state, t }: { state: AppState; t: string }) {
-  const [knee, setKnee] = useState<Feel>('same');
-  const [back, setBack] = useState<Feel>('same');
-  const last = state.sessions.filter(s => !s.practice && s.finishedAt && s.date < t).sort((a, b) => b.startedAt - a.startedAt)[0];
-  if (!last || daysBetween(last.date, t) > 3 || state.checkins.some(c => c.sessionId === last.id)) return null;
+  const [knee, setKnee] = useState<Feel>('ok');
+  const [back, setBack] = useState<Feel>('ok');
+  // Every gym day gets its own check (the deadlift rule depends on Thursday's), oldest unanswered first.
+  const last = state.sessions
+    .filter(s => !s.practice && s.finishedAt && s.date < t && daysBetween(s.date, t) <= 3 && !state.checkins.some(c => c.sessionId === s.id))
+    .sort((a, b) => a.startedAt - b.startedAt)[0];
+  if (!last) return null;
   const save = () => {
     const sets = state.sets.filter(x => x.sessionId === last.id && !x.extra);
     const tagged = (tag: string) => [...new Set(sets.map(x => x.exId))].filter(ex => state.program!.exercises[ex]?.tags?.includes(tag));
@@ -44,8 +48,9 @@ function CheckinCard({ state, t }: { state: AppState; t: string }) {
   };
   return (
     <div className="card">
-      <div className="overline">Morning check-in · after {NAMES[last.type]}</div>
-      <b>How do your knee and back feel this morning?</b>
+      <div className="overline">Morning check-in · after {NAMES[last.type]}{daysBetween(last.date, t) > 1 ? ` on ${niceDate(last.date)}` : ''}</div>
+      <b>How were your knee and back the morning after?</b>
+      <div className="muted small">"Worse" holds that session's main lifts at the same weight next week.</div>
       <div className="field"><div className="field-label">Knee</div><Segmented options={FEELS} value={knee} onChange={v => v && setKnee(v)} /></div>
       <div className="field"><div className="field-label">Back</div><Segmented options={FEELS} value={back} onChange={v => v && setBack(v)} /></div>
       <button className="btn primary fit-h" onClick={save}>Save check-in</button>
@@ -90,7 +95,9 @@ function CheckinOffers({ state }: { state: AppState }) {
   return (
     <>
       {c.reduce === 'pending' && <Row k="reduce" title="Go 10% lighter next time on these lifts" detail={lifts.map(id => ex[id].name).join(', ')} yes="Go lighter" />}
-      {c.backFlare === 'pending' && <Row k="backFlare" title="Swap deadlift and single-leg RDL for 45° back extension" detail="For the rest of this training week. Everything else stays the same." yes="Swap them" />}
+      {c.backFlare === 'pending' && <Row k="backFlare" title="Ease off for a back-flare week"
+        detail="For the rest of this training week: deadlift becomes 3 sets of 45° back extension, single-leg RDL and kettlebell swings are left out, back extensions don't go up in load, and lateral bends drop back one stage."
+        yes="Ease off" />}
       {c.blockPull === 'pending' && <Row k="blockPull" title="Pull from blocks at your next deadlift session" detail="Bar set just below the knee, to take load off the knee." yes="Use block pulls" />}
     </>
   );
@@ -289,7 +296,7 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
 
       {!VIEW_ONLY && <button className="card row tapcard" onClick={onStretch}>
         <span className="type stretch"><Icon name="clock" size={20} /></span>
-        <div className="grow"><b>Evening stretch</b><div className="muted small">{stretched === 0 ? 'Six stretches · about 8 min' : stretched >= p.stretches.length ? 'Done for today' : `${stretched} of ${p.stretches.length} done today`}</div></div>
+        <div className="grow"><b>Evening mobility</b><div className="muted small">{stretched >= p.stretches.length ? 'Done for today' : stretched === 0 ? `${p.stretches.length} movements` : `${stretched} of ${p.stretches.length} done today`} · {mobilityThisWeek(state, t)} this week, target {mobilityTargetText(state)}</div></div>
         {stretched >= p.stretches.length ? <span className="ok"><Icon name="check" /></span> : <span className="muted"><Icon name="right" /></span>}
       </button>}
 

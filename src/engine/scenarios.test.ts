@@ -1,6 +1,7 @@
 // Spec section 14 test scenarios that are pure rules (no screens, no network).
 import { describe, expect, it } from 'vitest';
 import { GymProfile } from './weights';
+import { backExtensionGoWeighted, lateralBendStageUp } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
 import { matchActivity, matchLaps } from './garmin';
@@ -62,6 +63,23 @@ describe('gym progression', () => {
     const h = [{ gymId: 'adelaide', weight: 80, reps: [7] }, { gymId: 'adelaide', weight: 80, reps: [10], deload: true }];
     expect(suggestRpt([6, 8, 10], h, incline).sets[0].weight).toBe(80);
     expect(nextBlockStart(82.5, incline)).toBe(77.5);
+  });
+
+  it('back extension goes weighted only when 3 x 12 felt easy (RIR 3 or 4+ on every set)', () => {
+    const set = (reps: number, rir: number | null) => ({ reps, rir });
+    expect(backExtensionGoWeighted([set(12, 3), set(12, 4), set(12, 3)], 3, 12)).toBe(true);
+    expect(backExtensionGoWeighted([set(12, 3), set(12, 2), set(12, 3)], 3, 12)).toBe(false);
+    expect(backExtensionGoWeighted([set(12, 3), set(11, 4), set(12, 3)], 3, 12)).toBe(false);
+    expect(backExtensionGoWeighted([set(12, null), set(12, 4), set(12, 3)], 3, 12)).toBe(false);
+  });
+
+  it('lateral bend moves up a stage only at 12 on every set, both sides, all controlled', () => {
+    const rows = (fn: (n: number, side: 'L' | 'R') => { reps?: number; controlled?: boolean }) =>
+      [1, 2, 3].flatMap(n => (['L', 'R'] as const).map(side => ({ setNo: n, side, reps: 12, controlled: true, ...fn(n, side) })));
+    expect(lateralBendStageUp(rows(() => ({})), 3, 12)).toBe(true);
+    expect(lateralBendStageUp(rows((n, s) => (n === 2 && s === 'L' ? { reps: 11 } : {})), 3, 12)).toBe(false);
+    expect(lateralBendStageUp(rows((n, s) => (n === 3 && s === 'R' ? { controlled: false } : {})), 3, 12)).toBe(false);
+    expect(lateralBendStageUp(rows(() => ({})).slice(0, 5), 3, 12)).toBe(false); // a side missing
   });
 
   it('straight sets: all at top -> one step, otherwise same', () => {

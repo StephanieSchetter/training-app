@@ -12,7 +12,7 @@ const DELOAD_WEEK = 8;
 export const estMax = (kg: number, reps: number) => kg * (1 + reps / 30);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-interface TopSet { date: string; gymId: string; weight: number | null; reps: number; total: number; level?: number; assist?: string }
+interface TopSet { date: string; gymId: string; weight: number | null; reps: number; total: number; level?: number; assist?: string; worse: boolean }
 
 /** One row per real session that included the lift: its top set, plus total reps. Ramp-ups, deloads and practice excluded. */
 function topSets(state: AppState, exId: string): TopSet[] {
@@ -29,6 +29,7 @@ function topSets(state: AppState, exId: string): TopSet[] {
       return [{
         date: s.date, gymId: s.gymId, weight: top[0].weight, reps: Math.min(...top.map(x => x.reps)),
         total: [...perSet.values()].reduce((a, b) => a + b, 0), level: top[0].level, assist: top[0].assist,
+        worse: state.checkins.some(c => c.sessionId === s.id && (c.knee === 'worse' || c.back === 'worse')),
       }];
     });
 }
@@ -50,6 +51,10 @@ export function liftChart(state: AppState, exId: string): LiftChart {
   if (scheme === 'legraise') {
     return { kind: 'level', unit: 'level', levels: state.program!.legRaiseLevels.map(l => `Level ${l.level}`), series: [{ name: 'Level', points: rows.map(r => ({ x: r.date, y: r.level ?? 1 })) }] };
   }
+  if (scheme === 'stage') {
+    const names = state.program!.lateralBendStages ?? ['Hands by sides', 'Hands crossed over chest', 'Hands above head'];
+    return { kind: 'level', unit: 'level', levels: names.map((_, i) => `Stage ${i + 1}`), series: [{ name: 'Stage', points: rows.map(r => ({ x: r.date, y: r.level ?? 1 })) }] };
+  }
   if (scheme === 'nordic') {
     return { kind: 'level', unit: 'level', levels: ['Band', 'Partial', 'Full'], series: [{ name: 'Level', points: rows.map(r => ({ x: r.date, y: Math.max(1, ASSIST.indexOf(r.assist ?? 'band') + 1) })) }] };
   }
@@ -63,6 +68,7 @@ export function liftChart(state: AppState, exId: string): LiftChart {
       added: weighted.length ? [{ name: 'Added weight', points: weighted.map(r => ({ x: r.date, y: r.weight!, note: `× ${r.reps}` })) }] : undefined,
     };
   }
+  const flag = (r: TopSet) => (r.worse ? ' · worse next morning' : '');
   const withMax = rows.filter(r => r.weight !== null).map(r => ({ ...r, max: estMax(r.weight!, r.reps) }));
   if (ex.equip === 'machine') {
     // Different machines at each gym, so show % change from the first session at that gym: one line per gym.
@@ -71,11 +77,23 @@ export function liftChart(state: AppState, exId: string): LiftChart {
       kind: 'percent', unit: '%',
       series: gyms.map(g => {
         const mine = withMax.filter(r => r.gymId === g);
-        return { name: GYM_NAMES[g] ?? g, points: mine.map(r => ({ x: r.date, y: round1((r.max / mine[0].max - 1) * 100), note: `${r.weight} kg × ${r.reps}` })) };
+        return { name: GYM_NAMES[g] ?? g, points: mine.map(r => ({ x: r.date, y: round1((r.max / mine[0].max - 1) * 100), note: `${r.weight} kg × ${r.reps}${flag(r)}` })) };
       }),
     };
   }
-  return { kind: 'max', unit: 'kg', series: [{ name: 'Estimated max', points: withMax.map(r => ({ x: r.date, y: round1(r.max), note: `${r.weight} kg × ${r.reps}` })) }] };
+  return { kind: 'max', unit: 'kg', series: [{ name: 'Estimated max', points: withMax.map(r => ({ x: r.date, y: round1(r.max), note: `${r.weight} kg × ${r.reps}${flag(r)}` })) }] };
+}
+
+/**
+ * The date of the morning check that is currently holding a main lift's weight: the last session
+ * with that lift was followed by a "worse" knee or back check-in. Null when nothing is held.
+ */
+export function heldSince(state: AppState, exId: string): string | null {
+  const isMain = Object.values(state.program!.sessions).flatMap(s => s.items).some(i => i.ex === exId && i.scheme.t === 'rpt');
+  if (!isMain) return null;
+  const last = state.sessions.filter(s => !s.practice && state.sets.some(x => x.sessionId === s.id && x.exId === exId && !x.rampUp && !x.extra)).sort((a, b) => a.startedAt - b.startedAt).at(-1);
+  const c = last && state.checkins.find(x => x.sessionId === last.id);
+  return c && (c.knee === 'worse' || c.back === 'worse') ? c.date : null;
 }
 
 /** Lifts in program order, grouped by session, for the Progress list. */
@@ -83,7 +101,7 @@ export function liftList(state: AppState): { session: string; items: { exId: str
   const p = state.program!;
   return ['gymB', 'gymC', 'gymA', 'gymD'].filter(k => p.sessions[k]).map(k => ({
     session: p.sessions[k].name,
-    items: p.sessions[k].items.filter(i => i.scheme.t !== 'log').map(i => ({ exId: i.ex, name: p.exercises[i.ex].name })),
+    items: p.sessions[k].items.filter(i => i.scheme.t !== 'log' && !i.warmup).map(i => ({ exId: i.ex, name: p.exercises[i.ex].name })),
   }));
 }
 

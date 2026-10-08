@@ -1,7 +1,7 @@
 // Settings (spec 5.7): gym equipment, rest times, swaps, body weight, physio notes, program, Garmin, upload.
 import { ReactNode, useRef, useState } from 'react';
 import { exportAll } from './export';
-import { AppState, Program, setProgram, today, uid, update } from './store';
+import { AppState, DROP, Program, setProgram, today, uid, update } from './store';
 import { APP_VERSION, requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
 import { clock, Icon, Sheet, SyncNowButton } from './ui';
 import { niceDate } from './Views';
@@ -35,7 +35,7 @@ const MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quads', 'ha
 const round = (n: number, step: number) => Math.round(n / step) * step;
 const WHEN: Record<string, string> = {
   'fifo': 'At the FIFO gym (automatic)',
-  'back-flare': 'Back flare (offered after a "worse" check-in)',
+  'back-flare': 'Back-flare week (offered after a "worse" back check-in)',
   'knee-after-deadlift': 'Knee worse after deadlifts (offered after a "worse" check-in)',
   'manual': 'Available from the Swap button',
 };
@@ -53,7 +53,7 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
   const [swap, setSwap] = useState({ from: '', to: '' });
   const p = state.program!;
   const back = () => setPage('main');
-  const name = (id: string) => p.exercises[id]?.name ?? id;
+  const name = (id: string) => (id === DROP ? 'Left out for the week' : p.exercises[id]?.name ?? id);
 
   if (page === 'gyms') {
     return (
