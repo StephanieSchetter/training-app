@@ -18,7 +18,7 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 16;
+export const APP_VERSION = 17;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;

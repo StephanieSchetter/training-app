@@ -31,6 +31,7 @@ function Sub({ title, onBack, children }: { title: string; onBack: () => void; c
   );
 }
 
+const MUSCLES = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'core', 'other'];
 const round = (n: number, step: number) => Math.round(n / step) * step;
 const WHEN: Record<string, string> = {
   'fifo': 'At the FIFO gym (automatic)',
@@ -112,6 +113,13 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
   if (page === 'swaps') {
     const planned = [...new Set(Object.values(p.sessions).flatMap(s => s.items.map(i => i.ex)))];
     const all = Object.keys(p.exercises).sort((a, b) => name(a).localeCompare(name(b)));
+    // Dropdowns list exercises under their main muscle group (the helper muscle if a lift has no main one).
+    const muscleOf = (id: string) => p.exercises[id]?.main?.[0] ?? p.exercises[id]?.helper?.[0] ?? 'other';
+    const grouped = (ids: string[]) => MUSCLES.filter(m => ids.some(id => muscleOf(id) === m)).map(m => (
+      <optgroup key={m} label={m[0].toUpperCase() + m.slice(1)}>
+        {ids.filter(id => muscleOf(id) === m).sort((a, b) => name(a).localeCompare(name(b))).map(id => <option key={id} value={id}>{name(id)}</option>)}
+      </optgroup>
+    ));
     return (
       <Sub title="Exercise swaps" onBack={back}>
         {Object.keys(WHEN).map(when => (
@@ -134,13 +142,13 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
           <label className="field"><span className="field-label">Instead of</span>
             <select value={swap.from} onChange={e => setSwap({ ...swap, from: e.target.value })}>
               <option value="">Choose an exercise</option>
-              {planned.map(id => <option key={id} value={id}>{name(id)}</option>)}
+              {grouped(planned)}
             </select>
           </label>
           <label className="field"><span className="field-label">Do this</span>
             <select value={swap.to} onChange={e => setSwap({ ...swap, to: e.target.value })}>
               <option value="">Choose an exercise</option>
-              {all.filter(id => id !== swap.from).map(id => <option key={id} value={id}>{name(id)}</option>)}
+              {grouped(all.filter(id => id !== swap.from))}
             </select>
           </label>
           <button className="btn primary fit-h" disabled={!swap.from || !swap.to} onClick={() => {
