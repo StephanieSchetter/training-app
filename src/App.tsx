@@ -23,7 +23,7 @@ function Login() {
         setError(await signIn(email.trim(), password));
         setBusy(false);
       }}>
-        <h1>Training</h1>
+        <h1>Compound</h1>
         <p className="muted">Sign in once. This phone stays signed in.</p>
         <label className="field"><span className="field-label">Email</span>
           <input type="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} required />
@@ -56,7 +56,7 @@ export function App() {
   if (!state.program) {
     return (
       <div className="screen"><main className="page home">
-        <h1>Training</h1>
+        <h1>Compound</h1>
         <p className="muted">{navigator.onLine ? 'Fetching your program…' : 'You are offline. Connect once so the app can fetch your program.'}</p>
         {sync.error && <div className="notice">{sync.error}</div>}
         <button className="btn" onClick={() => syncNow()}>Try again</button>

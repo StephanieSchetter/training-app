@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Training',
-        short_name: 'Training',
+        name: 'Compound',
+        short_name: 'Compound',
         description: 'Personal training log',
         start_url: '.',
         scope: '.',

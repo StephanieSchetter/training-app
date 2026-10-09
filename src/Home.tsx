@@ -153,7 +153,7 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
       <header className="home-head">
         <div>
           <div className="overline">{niceDate(t, true)}</div>
-          <h1>{started ? `Block ${p.block} · Week ${week}` : 'Training'}</h1>
+          <h1>{started ? `Block ${p.block} · Week ${week}` : 'Compound'}</h1>
           <div className="muted">{started ? `${gym.name} gym${stint ? ` · ${stint.location}` : ''}` : `Block ${p.block} starts ${niceDate(p.start)}`}</div>
         </div>
         <button className={'pill' + (sync.pending ? ' warn' : '')} onClick={() => syncNow()}>
