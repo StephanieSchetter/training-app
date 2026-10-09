@@ -18,7 +18,7 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 21;
+export const APP_VERSION = 22;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -279,6 +279,20 @@ export async function requestGarminSync(): Promise<'requested' | 'not-set-up' | 
   // The job takes about a minute; look for its results a few times afterwards.
   for (const s of [60, 100, 150]) setTimeout(syncNow, s * 1000);
   return 'requested';
+}
+
+/**
+ * Asks for a Garmin pull without being told to, when the app is opened and today's numbers are missing.
+ * GitHub's own schedule often runs hours late, so this is what gets the morning data in on time.
+ * Limited to one request every 20 minutes. Returns true if a pull was asked for (now or recently).
+ */
+export async function autoGarminSync(): Promise<boolean> {
+  const KEY = 'training-app-garmin-auto';
+  const last = Number(localStorage.getItem(KEY) ?? 0);
+  if (Date.now() - last < 20 * 60 * 1000) return Date.now() - last < 4 * 60 * 1000;
+  if (LOCAL_ONLY || !session || !navigator.onLine) return false;
+  localStorage.setItem(KEY, String(Date.now()));
+  return (await requestGarminSync()) === 'requested';
 }
 
 export async function signIn(email: string, password: string): Promise<string | null> {

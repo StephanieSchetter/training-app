@@ -1,5 +1,5 @@
 // The Today tab (spec 5.1): what to do today, anything that needs a decision, and what's coming.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { readinessSuggestion } from './engine/running';
 import { addDays, isGym, shiftFrom, Slot } from './engine/schedule';
 import { startGym } from './Gym';
@@ -9,7 +9,7 @@ import { buildRun } from './runplan';
 import { EASY_HR_HIGH, EASY_HR_OK } from './engine/running';
 import { easyPace, trendTiles } from './stats';
 import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
-import { requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
+import { autoGarminSync, requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
 import { Icon, Segmented, Sheet, SyncNowButton } from './ui';
 import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from './Views';
 
@@ -123,6 +123,16 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
   const inProgress = state.sessions.filter(s => !s.finishedAt);
   const runsOpen = state.runs.filter(r => !r.finishedAt);
   const garminDay = state.garminDays[t];
+  // The strip never just disappears: until today's numbers arrive it shows the most recent day, labelled.
+  const latestKey = garminDay ? t : Object.keys(state.garminDays).filter(d => d < t).sort().at(-1);
+  const shownDay = latestKey ? state.garminDays[latestKey] : undefined;
+  // Opening the app with no data for today asks for a fresh Garmin pull by itself (at most every 20 minutes).
+  const [fetching, setFetching] = useState(false);
+  const haveToday = !!garminDay;
+  useEffect(() => {
+    if (haveToday || !state.garminStatus) return;
+    autoGarminSync().then(asked => setFetching(asked));
+  }, [haveToday, t, !!state.garminStatus]);
   const lastGarmin = state.garminStatus?.lastSync ? Date.parse(state.garminStatus.lastSync) : null;
   const garminStale = state.garminStatus !== null && (lastGarmin === null || Date.now() - lastGarmin > 24 * 3600 * 1000);
   const alerts = state.alerts.filter(a => a.status === 'open');
@@ -174,12 +184,19 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
           <SyncNowButton request={requestGarminSync} />
         </div>
       )}
-      {garminDay && (
-        <div className="stats four">
-          <div><div className="overline">Readiness</div><b>{garminDay.readiness ?? '—'}</b></div>
-          <div><div className="overline">Sleep</div><b>{garminDay.sleepHours != null ? `${garminDay.sleepHours.toFixed(1)} h` : '—'}</b></div>
-          <div><div className="overline">Resting HR</div><b>{garminDay.restingHr ?? '—'}</b></div>
-          <div><div className="overline">HRV</div><b>{garminDay.hrv != null ? Math.round(garminDay.hrv) : '—'}</b></div>
+      {shownDay && (
+        <div className="stack tight">
+          <div className={'stats four' + (garminDay ? '' : ' old')}>
+            <div><div className="overline">Readiness</div><b>{shownDay.readiness ?? '—'}</b></div>
+            <div><div className="overline">Sleep</div><b>{shownDay.sleepHours != null ? `${shownDay.sleepHours.toFixed(1)} h` : '—'}</b></div>
+            <div><div className="overline">Resting HR</div><b>{shownDay.restingHr ?? '—'}</b></div>
+            <div><div className="overline">HRV</div><b>{shownDay.hrv != null ? Math.round(shownDay.hrv) : '—'}</b></div>
+          </div>
+          {!garminDay && (
+            <div className="muted small">
+              These are from {niceDate(latestKey!, true)}. {fetching ? "Today's Garmin numbers are being fetched now; they usually arrive within two minutes." : "Today's Garmin numbers aren't in yet. Make sure your watch has synced to the Garmin app, then use Sync Garmin now in Settings."}
+            </div>
+          )}
         </div>
       )}
 
