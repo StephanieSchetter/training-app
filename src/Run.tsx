@@ -88,7 +88,7 @@ export function RunSession({ runId }: { runId: string }) {
       <div className="segs">{run.segs.map((s, i) => <span key={i} className={(s.done ? 'full ' : '') + (i === cur ? 'cur' : '')} />)}</div>
 
       <main className="page">
-        {plan.over8 && cur === 0 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than 8 km in total ({plan.km.toFixed(1)} km).</div>}
+        {plan.over8 && cur === 0 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than {plan.capKm} km in total ({plan.km.toFixed(1)} km).</div>}
 
         {seg ? (
           <>

@@ -39,7 +39,14 @@ await click('Settings'); await shot('settings');
 await click('Today');
 await click('Gym B', 1); await shot('start');
 await click('Start warm-up'); await click('Cat-cow'); await click('Thoracic'); await shot('warmup');
-await click('Start lifting'); await shot('first-set');
+await click('Start lifting');
+// Tuesday now opens with medicine-ball throws and pull-up practice; log those to reach the first lift
+for (let i = 0; i < 3; i++) await click('Done');
+await click('Next exercise');
+for (let i = 0; i < 2; i++) await click('Done');
+await click('Next exercise');
+await click('Skip');
+await shot('first-set');
 for (let i = 0; i < 8; i++) await click('More Weight');
 await click('Log as ramp-up');
 for (let i = 0; i < 2; i++) await click('More Weight');

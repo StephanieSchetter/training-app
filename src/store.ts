@@ -31,6 +31,8 @@ export interface ProgramItem {
   byWeek?: { weeks: number[]; scheme?: Scheme; rir?: string }[];
   /** A warm-up exercise: logged, but never counted in sets, progression or charts. */
   warmup?: boolean;
+  /** Label for an uncounted exercise that isn't a warm-up, e.g. "Practice" or "Power". */
+  tag?: string;
   /** Weight to pre-fill the first time this lift is done (otherwise week 1 is "find your load"). */
   startWeight?: number;
 }
@@ -52,11 +54,14 @@ export interface Program {
 }
 export interface RunWeek {
   easy: { min: number; speed: number; strides?: boolean };
-  intervals: { reps: number; km: number; recMin: number; note?: string } | { timeTrial: true };
-  threshold: { reps: number; min: number; recMin?: number } | { easyKm: number; speed: number; strides?: boolean };
+  /** easyAfterMin: easy running at the week's easy speed between the main set and the cool-down. */
+  intervals: { reps: number; km: number; recMin: number; note?: string; easyAfterMin?: number } | { timeTrial: true };
+  threshold: { reps: number; min: number; recMin?: number; easyAfterMin?: number } | { easyKm: number; speed: number; strides?: boolean };
 }
 export interface RunningPlan {
   incline: string;
+  /** Warn when a run's total distance goes over this (default 8). */
+  maxKm?: number;
   speeds: { intervals: number; threshold: number; recovery: number; thresholdRecovery: number; strides: number; strideRecovery: number; cooldown: number };
   weeks: Record<string, RunWeek>;
 }

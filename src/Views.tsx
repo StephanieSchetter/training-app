@@ -137,7 +137,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
               {date === t && !run.timeTrial && slot && !slot.done && (
                 <ReadinessCard score={score} type={type} choice={runChoice} onChoose={(_s, accepted) => setRunChoice(accepted)} />
               )}
-              {run.over8 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than 8 km in total.</div>}
+              {run.over8 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than {run.capKm} km in total.</div>}
               {run.sections.map(sec => (
                 <div key={sec.title} className="stack">
                   <h2>{sec.title}</h2>
@@ -192,7 +192,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
             return (
               <div className="line top" key={p.ex}>
                 <div className="grow">
-                  <div>{p.pair ? <span className="tag">{p.pair}{plan.filter(x => x.pair === p.pair).indexOf(p) + 1}</span> : null}{p.warmup ? <span className="tag">Warm-up</span> : null}{logged ? p.info.name : p.title}</div>
+                  <div>{p.pair ? <span className="tag">{p.pair}{plan.filter(x => x.pair === p.pair).indexOf(p) + 1}</span> : null}{p.tag ? <span className="tag">{p.tag}</span> : null}{logged ? p.info.name : p.title}</div>
                   {p.swapLabel && <div className="small warn-text">{p.swapLabel}</div>}
                   {logged
                     ? (done.length

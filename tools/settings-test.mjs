@@ -84,6 +84,7 @@ await click('Start Gym B');
 const start = await text();
 check('The new FIFO swap shows on the session start screen', /Leg Extension[\s\S]{0,30}Light Raised Goblet Squat/.test(start), start.split('SWAPS AT THIS GYM')[1]);
 await click('Start warm-up'); await click('Start lifting');
+await click('Next exercise'); await click('Next exercise'); // past the throws and pull-up practice
 check('The changed rest time is used in the session', (await text()).includes('Rest 3:15'));
 
 await browser.close();

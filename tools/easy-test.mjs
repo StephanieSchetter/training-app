@@ -33,7 +33,7 @@ check('After a time trial, three easy runs at 145 or under suggest +0.2', t.incl
 check('It states the ceiling', t.includes('11.0 km/h'));
 await click('Use 10.4');
 t = await text();
-check('Accepting changes upcoming easy runs to 10.4', /Easy Run\s*40 min at 10\.4 km\/h/.test(t) && !/easy pace/i.test(t), t.split('TODAY')[1]);
+check('Accepting changes upcoming easy runs to 10.4', /Easy Run\s*45 min at 10\.4 km\/h/.test(t) && !/easy pace/i.test(t), t.split('TODAY')[1]);
 check('The answer is stored', (await page.evaluate(() => window.__dev.getState().alerts.filter(a => a.kind === 'easy-pace').map(a => a.status).join())) === 'accepted');
 await addRuns(10.4, [146, 153, 147], 5); await wait(400);
 t = await text();

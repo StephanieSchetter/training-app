@@ -175,7 +175,7 @@ export function GymSession({ sessionId }: { sessionId: string }) {
             {plan.map(p => (
               <div className="line" key={p.ex}>
                 <div>
-                  <div>{p.pair ? <span className="tag">{p.pair}{blocks(plan).find(b => b.includes(p))!.indexOf(p) + 1}</span> : null}{p.warmup ? <span className="tag">Warm-up</span> : null}{p.title}</div>
+                  <div>{p.pair ? <span className="tag">{p.pair}{blocks(plan).find(b => b.includes(p))!.indexOf(p) + 1}</span> : null}{p.tag ? <span className="tag">{p.tag}</span> : null}{p.title}</div>
                   <div className="muted small">{schemeText(p)}{p.rir !== program.rirByWeek[session.week] ? ` · RIR ${p.rir}` : ''}</div>
                 </div>
                 <div className="muted nowrap">{p.usesWeight ? (p.targets[0]?.weight != null ? fmtKg(p.targets[0].weight) : 'Find load') : 'Bodyweight'}</div>

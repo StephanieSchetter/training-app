@@ -45,7 +45,7 @@ async function doIntervals(date, answer, { skipLast = false } = {}) {
 // Practice run before the block: answering "Yes" must change nothing
 await on('2026-10-07');
 await click('Intervals', 1);
-for (let i = 0; i < 12; i++) await click('Done');
+for (let i = 0, n = await page.evaluate(() => document.querySelectorAll('.segs > *').length); i < n; i++) await click('Done');
 await click('One question');
 await click('Yes');
 const afterPractice = await text();

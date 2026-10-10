@@ -12,7 +12,7 @@ export function runAdjustFor(score: number, type: RunType): RunAdjust {
 
 export interface RunLine { text: string; detail?: string; km: number; /** A rep or main run whose speed is logged. */ work?: boolean; speed?: number }
 export interface RunSection { title: string; lines: RunLine[] }
-export interface RunPlan { title: string; summary: string; sections: RunSection[]; km: number; over8: boolean; timeTrial?: boolean; /** Asks "2 more reps?" at the end. */ asks: boolean }
+export interface RunPlan { title: string; summary: string; sections: RunSection[]; km: number; over8: boolean; /** The distance the warning is measured against. */ capKm: number; timeTrial?: boolean; /** Asks "2 more reps?" at the end. */ asks: boolean }
 
 const kmFor = (minutes: number, speed: number) => (minutes * speed) / 60;
 const mins = (m: number) => (m < 1 ? `${Math.round(m * 60)} sec` : Number.isInteger(m) ? `${m} min` : `${Math.floor(m)} min ${Math.round((m % 1) * 60)} sec`);
@@ -49,6 +49,11 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
     { text: `6 × 20 sec at ${sp.strides} km/h`, detail: `40 sec at ${sp.strideRecovery} km/h between each`, km: kmFor(2, sp.strides) + kmFor(200 / 60, sp.strideRecovery) },
   ] };
 
+  // Extra aerobic volume (agreed 10 Oct 2026): easy running after the hard part, inside the same session.
+  const easyAfter = (m?: number): RunSection[] => (m ? [{ title: 'Easy running', lines: [
+    { text: `${m} min at ${w.easy.speed} km/h`, detail: 'Steady and relaxed. This is the extra aerobic work.', km: kmFor(m, w.easy.speed) },
+  ] }] : []);
+
   let title = '';
   let summary = '';
   let sections: RunSection[] = [];
@@ -83,7 +88,7 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
         lines.push({ text: `Rep ${i} of ${iv.reps}: ${dist(iv.km)} at ${sp.intervals} km/h`, detail: `Takes ${mmss(repSeconds(iv.km, sp.intervals))}`, km: iv.km, work: true, speed: sp.intervals });
         if (i < iv.reps) lines.push({ text: `Recovery: ${mins(iv.recMin)} at ${sp.recovery} km/h`, km: kmFor(iv.recMin, sp.recovery) });
       }
-      sections = [warm, { title: 'Main set', lines }, cool];
+      sections = [warm, { title: 'Main set', lines }, ...easyAfter(iv.easyAfterMin), cool];
     }
   } else {
     const th = w.threshold;
@@ -98,10 +103,11 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
         lines.push({ text: `${th.reps === 1 ? 'Continuous' : `Rep ${i} of ${th.reps}`}: ${th.min} min at ${sp.threshold} km/h`, detail: `About ${kmFor(th.min, sp.threshold).toFixed(1)} km`, km: kmFor(th.min, sp.threshold), work: true, speed: sp.threshold });
         if (i < th.reps) lines.push({ text: `Recovery: ${mins(th.recMin ?? 2)} at ${sp.thresholdRecovery} km/h`, km: kmFor(th.recMin ?? 2, sp.thresholdRecovery) });
       }
-      sections = [warm, { title: 'Main set', lines }, cool];
+      sections = [warm, { title: 'Main set', lines }, ...easyAfter(th.easyAfterMin), cool];
     }
   }
 
   const km = sections.reduce((a, s) => a + s.lines.reduce((b, l) => b + l.km, 0), 0);
-  return { title, summary, sections, km, over8: km > MAX_RUN_KM + 1e-6, timeTrial, asks };
+  const capKm = plan.maxKm ?? MAX_RUN_KM;
+  return { title, summary, sections, km, over8: km > capKm + 1e-6, capKm, timeTrial, asks };
 }

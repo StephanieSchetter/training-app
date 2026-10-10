@@ -35,6 +35,8 @@ export interface PlanItem {
   rir: string;
   /** A warm-up exercise: never counted in sets or progression. */
   warmup: boolean;
+  /** Short label for an uncounted exercise: "Warm-up", "Practice" or "Power". */
+  tag?: string;
 }
 
 export const LATERAL_BEND_STAGES = ['Hands by sides', 'Hands crossed over chest', 'Hands above head'];
@@ -359,7 +361,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       equip, usesWeight, targets, repsLabel, reason,
       rest: state.restOverrides[ex] ?? (isMain ? 180 : 90),
       isMain, setup, level, assist, rirExtra,
-      rir: byWeek?.rir ?? program.rirByWeek[week], warmup: !!item.warmup,
+      rir: byWeek?.rir ?? program.rirByWeek[week], warmup: !!item.warmup, tag: item.warmup ? item.tag ?? 'Warm-up' : undefined,
     };
   });
 }
