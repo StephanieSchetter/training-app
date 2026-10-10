@@ -26,6 +26,19 @@ describe('gym progression', () => {
     expect(weights(suggestRpt([6, 8, 10], [miss, miss], incline))[0]).toBe(72.5);
   });
 
+  it('a top set on target with 4+ in reserve goes up a step; anything harder adds a rep', () => {
+    const easy = { gymId: 'adelaide', weight: 80, reps: [6, 8, 10], topRir: 4 };
+    const s = suggestRpt([6, 8, 10], [easy], incline);
+    expect(weights(s)).toEqual([82.5, 75, 67.5]);
+    expect(s.sets[0].reps).toBe(6);
+    for (const topRir of [3, null, undefined]) {
+      const t = suggestRpt([6, 8, 10], [{ ...easy, topRir }], incline);
+      expect([t.sets[0].weight, t.sets[0].reps]).toEqual([80, 7]);
+    }
+    // short of the target is still a miss, however it was rated
+    expect(suggestRpt([6, 8, 10], [{ ...easy, reps: [5] }], incline).sets[0].weight).toBe(80);
+  });
+
   it('3: 80 x 5 on a bad day is not a miss', () => {
     const miss = { gymId: 'adelaide', weight: 80, reps: [5] };
     const s = suggestRpt([6, 8, 10], [miss, { ...miss, excused: true }], incline);

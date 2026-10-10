@@ -97,6 +97,7 @@ function sessionResult(sets: SetLog[], session: SessionLog, worseBefore: boolean
     reps: [...bySet.values()].map(g => Math.min(...g.map(x => x.reps))),
     excused: !!(session.badDay || session.readinessAccepted || session.readiness?.accepted || worseBefore),
     deload: session.week === DELOAD_WEEK,
+    topRir: work.filter(s => s.setNo === work[0].setNo).reduce<number | null>((low, s) => (s.rir === null || low === null ? null : Math.min(low, s.rir)), Infinity),
   };
 }
 
@@ -141,7 +142,9 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     const swapped = ex !== item.ex;
     const info = program.exercises[ex];
     const past = pastFor(state, ex, session);
-    const history = past.map(p => p.result);
+    // The deadlift follows the physio's graded return, so "felt very easy" never speeds it up.
+    const graded = ex === 'deadlift' || ex === 'block_pull';
+    const history = past.map(p => (graded ? { ...p.result, topRir: null } : p.result));
     const byWeek = item.byWeek?.find(b => b.weeks.includes(week));
     let equip = info.equip;
     let scheme = schemeIn(item, week);

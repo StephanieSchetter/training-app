@@ -19,6 +19,8 @@ export interface PastResult {
   /** Bad-day flag, accepted readiness adjustment, or "worse" check-in after the previous session. */
   excused?: boolean;
   deload?: boolean;
+  /** Reps in reserve logged on the top set (4 = "4+"); for each-leg lifts the lower side. Unset when not logged. */
+  topRir?: number | null;
 }
 
 export interface SetTarget { weight: number | null; reps: number }
@@ -67,6 +69,9 @@ export function suggestRpt(scheme: number[], history: PastResult[], ctx: LiftCtx
     ({ kind: 'weights', sets: rptSets(top, scheme, topReps, ctx), reason });
 
   if (reps >= b) return out(oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId), a, 'Hit the top of the range: one step up');
+  // Agreed 10 Oct 2026: a top set that reached its target with 4+ in reserve was far too light, so go up now
+  // rather than adding a rep a week. The deadlift never gets here: its history carries no topRir.
+  if (reps >= a && (last.topRir ?? 0) >= 4) return out(oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId), a, 'Felt very easy last time (4+ in reserve): one step up');
   if (reps >= a) return out(r(last.weight), Math.min(reps + 1, b), 'Same weight, aim for one more rep');
   if (last.excused) return out(r(last.weight), a, 'Excused miss: same weight');
 
