@@ -212,7 +212,7 @@ export function GymSession({ sessionId }: { sessionId: string }) {
               </button>
             );
           })}
-          <p className="lead">{session.warmupOnly ? 'Readiness is very low, so today is warm-up and stretching only.' : 'Then 1–2 lighter ramp-up sets of the first lift before the top set.'}</p>
+          <p className="lead">{session.warmupOnly ? 'Readiness is very low, so today is warm-up and stretching only.' : 'Each main lift then starts with its own ramp-up sets. They are listed on its screen with the weights to use.'}</p>
         </main>
         <Dock><button className="btn primary" onClick={() => setPhase(session.warmupOnly ? 'finish' : 'lifts')}>{session.warmupOnly ? 'Done for today' : 'Start lifting'}</button></Dock>
         {leaveSheet}
@@ -570,10 +570,40 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   };
 
   const canRamp = !done && round === 0 && side !== 'R' && item.usesWeight && !sets.some(s => s.exId === item.ex && !s.rampUp && !s.extra);
+  // Main lifts open with their ramp-up sets: ticked off in order, logged as ramp-ups, never counted.
+  const rampDone = sets.filter(s => s.exId === item.ex && s.rampUp).length;
+  const showRamp = canRamp && item.isMain;
+  const logRamp = (t: { weight: number | null; reps: number }) => {
+    navigator.vibrate?.(25);
+    const id = uid();
+    write('sets', id, s => { s.sets.push({ id, sessionId: session.id, exId: item.ex, plannedExId: item.plannedEx, setNo: 0, weight: t.weight, reps: t.reps, rir: null, rampUp: true, level: item.level, suggestedWeight: t.weight, suggestedReps: t.reps, ts: Date.now() }); });
+    onLogged(null);
+  };
   const unit = item.scheme.t === 'fixed' && item.scheme.unit ? item.scheme.unit : 'reps';
 
   return (
     <>
+      {showRamp && (
+        <div className="card">
+          <div className="overline">Ramp-up first · not counted</div>
+          {item.ramp.length > 0 ? (
+            <>
+              <div className="list">
+                {item.ramp.map((t, i) => (
+                  <button key={i} className={'setrow planrow' + (i < rampDone ? ' done' : '')} disabled={i !== rampDone} aria-label={`Ramp-up ${i + 1}`} onClick={() => logRamp(t)}>
+                    <span className={'circle sm' + (i < rampDone ? ' on' : '')}>{i < rampDone && <Icon name="check" size={14} />}</span>
+                    <span className="grow">{fmtKg(t.weight)} × {t.reps}{item.info.eachSide ? ' each side' : ''}</span>
+                    {i === rampDone && <span className="muted small">Tap when done</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="muted small">Easy and crisp, about a minute between them. Then rest 2–3 minutes before the first working set below.</div>
+            </>
+          ) : (
+            <div className="muted">Build up over 2–3 lighter sets: about half, then three-quarters of what you expect to lift, for a few easy reps each. Log each one with "Log as ramp-up set" below, then do your first counted set.</div>
+          )}
+        </div>
+      )}
       <div className={'card target-card' + (done ? ' editing' : '')}>
         <div className="row">
           <div className="overline">{done ? 'Editing · ' : ''}Set {round + 1} of {item.targets.length}{side ? ` · ${sideName(side)} side` : ''}</div>

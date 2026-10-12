@@ -56,6 +56,26 @@ export function rptSets(top: number, scheme: number[], topReps: number, ctx: Lif
   }));
 }
 
+const BAR_KG = 20;
+
+/**
+ * Ramp-up sets before a main lift's first working set (agreed 12 Oct 2026). The first main lift of a
+ * session gets three (about 50% x 5, 70% x 3, 85% x 1); later ones are already warm and get two
+ * (60% x 5, 80% x 2). Each is rounded to a weight that exists; a barbell never goes below the empty bar;
+ * anything that rounds to the working weight, or repeats the set before it, is dropped.
+ */
+export function rampSets(top: number, firstMainLift: boolean, ctx: LiftCtx): SetTarget[] {
+  const plan = firstMainLift ? [[0.5, 5], [0.7, 3], [0.85, 1]] : [[0.6, 5], [0.8, 2]];
+  const floor = ctx.equip === 'barbell' || ctx.equip === 'barbell_heavy' ? BAR_KG : 0;
+  const out: SetTarget[] = [];
+  for (const [share, reps] of plan) {
+    const w = Math.max(floor, roundNearest(top * share, ctx.equip, ctx.gym, ctx.exId));
+    if (w <= 0 || w >= top || out.at(-1)?.weight === w) continue;
+    out.push({ weight: w, reps });
+  }
+  return out;
+}
+
 /** Main lifts (6.4) with the miss rules (6.6). scheme e.g. [6, 8, 10]. */
 export function suggestRpt(scheme: number[], history: PastResult[], ctx: LiftCtx): Suggestion {
   const [a, b] = scheme;

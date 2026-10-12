@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { GymProfile, nudge, oneStepUp, roundDown, roundNearest } from './weights';
 import { backExtensionGoWeighted, lateralBendStageUp } from './progression';
+import { rampSets } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
 import { matchActivity, matchLaps } from './garmin';
@@ -203,6 +204,28 @@ describe('running', () => {
 
   it('1 km at 13.8 takes 4:21', () => {
     expect(mmss(repSeconds(1, 13.8))).toBe('4:21');
+  });
+});
+
+describe('ramp-up sets before a main lift', () => {
+  const sets = (top: number, first: boolean, ctx: LiftCtx) => rampSets(top, first, ctx).map(s => `${s.weight}x${s.reps}`).join(' ');
+  const deadlift: LiftCtx = { exId: 'deadlift', equip: 'barbell_heavy', gym: adelaide, week: 1 };
+  const press: LiftCtx = { exId: 'db_shoulder_press', equip: 'dumbbell', gym: adelaide, week: 3 };
+
+  it('first main lift of the session: three sets building to the working weight', () => {
+    expect(sets(70, true, deadlift)).toBe('35x5 50x3 60x1');
+    expect(sets(100, true, incline)).toBe('50x5 70x3 85x1');
+  });
+
+  it('later main lifts are already warm: two sets', () => {
+    expect(sets(80, false, incline)).toBe('47.5x5 65x2');
+    expect(sets(25, false, press)).toBe('15x5 20x2');
+  });
+
+  it('a barbell never goes below the empty bar, and repeats or the working weight itself are dropped', () => {
+    expect(sets(30, true, incline)).toBe('20x5 25x1');
+    expect(sets(20, true, incline)).toBe('');
+    expect(sets(7.5, true, press)).toBe('2.5x5 5x3');
   });
 });
 

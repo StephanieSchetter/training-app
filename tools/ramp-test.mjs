@@ -1,0 +1,72 @@
+// Checks the ramp-up sets shown before a main lift: weights worked out from the working weight, ticked
+// off in order, logged as ramp-ups and never counted. Usage: node tools/ramp-test.mjs [output-folder]
+import puppeteer from 'puppeteer-core';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+const out = process.argv[2];
+if (out) mkdirSync(out, { recursive: true });
+const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(existsSync);
+const browser = await puppeteer.launch({ executablePath: chrome, headless: true });
+const page = await browser.newPage();
+await page.setViewport({ width: 384, height: 824, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+page.on('pageerror', e => console.log('PAGE ERROR', e.message));
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const results = [];
+const check = (name, pass, detail) => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + String(detail).replace(/\s+/g, ' ').slice(0, 220) : ''}`); };
+const text = () => page.evaluate(() => document.body.innerText);
+const shot = async name => { if (out) { await wait(300); await page.screenshot({ path: join(out, `ramp-${name}.png`) }); } };
+const click = async (label, nth = 0) => {
+  const ok = await page.evaluate((label, nth) => {
+    const b = [...document.querySelectorAll('button')].filter(b => b.textContent.trim().startsWith(label) || b.getAttribute('aria-label') === label)[nth];
+    if (!b) return false;
+    b.click();
+    return true;
+  }, label, nth);
+  if (!ok) throw new Error(`No button "${label}" on: ${(await text()).slice(0, 300)}`);
+  await wait(150);
+};
+const ramps = () => page.evaluate(() => window.__dev.getState().sets.filter(s => s.rampUp).map(s => `${s.exId}:${s.weight}x${s.reps}`).join());
+
+// Thursday of week 1 at Port Hedland: the deadlift starts at 70 kg
+await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-15', { waitUntil: 'networkidle0' }); await wait(250);
+await click('Start Gym C'); await click('Start warm-up');
+check('The warm-up screen points to the ramp-up sets', (await text()).includes('Each main lift then starts with its own ramp-up sets'));
+await click('Start lifting');
+await click('Next exercise');                 // past the back-extension primer
+await click('1.25');                          // smallest plate at this gym, asked once
+let t = await text();
+check('Deadlift at 70 kg shows three ramp-up sets', /RAMP-UP FIRST/i.test(t) && t.includes('35 kg × 5') && t.includes('50 kg × 3') && t.includes('60 kg × 1'), t.split(/RAMP-UP FIRST/i)[1]);
+await shot('deadlift');
+await click('Ramp-up 1');
+check('Ticking one logs it as a ramp-up', (await ramps()) === 'deadlift:35x5', await ramps());
+await click('Ramp-up 2'); await click('Ramp-up 3');
+check('All three logged in order', (await ramps()) === 'deadlift:35x5,deadlift:50x3,deadlift:60x1', await ramps());
+await click('Done');
+t = await text();
+check('After the first working set the ramp-up card is gone', !/RAMP-UP FIRST/i.test(t));
+check('Ramp-ups are not counted as working sets', await page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'deadlift' && !s.rampUp).length === 1));
+await click('Skip'); await click('Done'); await click('Skip'); await click('Done'); await click('Skip');
+await click('Next exercise');
+t = await text();
+check('A main lift with no weight yet (week 1) explains how to build up instead', /RAMP-UP FIRST/i.test(t) && t.includes('Build up over 2–3 lighter sets') && /Flat Dumbbell Bench Press/i.test(t), t.slice(0, 260));
+await click('Next exercise');
+check('Lifts that are not main lifts have no ramp-up card', !/RAMP-UP FIRST/i.test(await text()), (await text()).slice(0, 120));
+
+// Week 3 in Adelaide: a second main lift of the session gets two sets
+await page.evaluate(() => window.__dev.update(s => {
+  const at = Date.now() - 86400000;   // the real clock orders sessions, whatever the pretend date
+  s.sessions.push({ id: 'w2c', slotIdx: null, type: 'gymC', date: '2026-10-22', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
+  s.sets.push({ id: 'b1', sessionId: 'w2c', exId: 'db_bench', plannedExId: 'db_bench', setNo: 1, weight: 30, reps: 8, rir: 2, suggestedWeight: null, suggestedReps: 6, ts: at });
+  s.profiles.find(p => p.id === 'adelaide').smallestPlate = 1.25;
+  s.activeSessionId = null;
+}));
+await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-29', { waitUntil: 'networkidle0' }); await wait(250);
+await click('Start Gym C'); await click('Start warm-up'); await click('Start lifting');
+await click('Next exercise'); await click('Next exercise');
+t = await text();
+check('Second main lift of the day (bench at 32.5 kg) gets two ramp-up sets', /Flat Dumbbell Bench Press/i.test(t) && t.includes('20 kg × 5') && t.includes('25 kg × 2') && !t.includes('× 1\n'), t.split(/RAMP-UP FIRST/i)[1]);
+await shot('bench');
+
+await browser.close();
+console.log(results.every(Boolean) ? `\nAll ${results.length} ramp-up checks passed` : `\n${results.filter(x => !x).length} of ${results.length} ramp-up checks FAILED`);
+process.exit(results.every(Boolean) ? 0 : 1);

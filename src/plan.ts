@@ -2,7 +2,7 @@
 import type { Equip, GymProfile } from './engine/weights';
 import { gridStep, oneStepUp, roundNearest } from './engine/weights';
 import {
-  backExtensionGoWeighted, deloadSetCount, dipsGoWeighted, lateralBendStageUp, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
+  backExtensionGoWeighted, deloadSetCount, rampSets, dipsGoWeighted, lateralBendStageUp, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
   PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
 } from './engine/progression';
 import { DROP } from './store';
@@ -37,6 +37,8 @@ export interface PlanItem {
   warmup: boolean;
   /** Short label for an uncounted exercise: "Warm-up", "Practice" or "Power". */
   tag?: string;
+  /** Ramp-up sets to do before the first working set of a main lift. Empty until there is a weight to work from. */
+  ramp: SetTarget[];
 }
 
 export const LATERAL_BEND_STAGES = ['Hands by sides', 'Hands crossed over chest', 'Hands above head'];
@@ -137,6 +139,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
   const flare = flareWeek(state, week);
   const everyItem = Object.values(program.sessions).flatMap(s => s.items);
 
+  let mainLiftsSoFar = 0;
   return program.sessions[session.type].items.filter(item => session.swaps[item.ex] !== DROP).map(item => {
     const ex = session.swaps[item.ex] ?? item.ex;
     const swapped = ex !== item.ex;
@@ -358,12 +361,15 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     else if (equip === 'kettlebell' && !gym.kettlebells.length) setup = 'kettlebell';
 
     const isMain = item.scheme.t === 'rpt';
+    const top = targets[0]?.weight ?? null;
+    const ramp = isMain && usesWeight && top !== null ? rampSets(top, mainLiftsSoFar === 0, ctx()) : [];
+    if (isMain && usesWeight) mainLiftsSoFar++;
     return {
       plannedEx: item.ex, ex, info, title, scheme, pair: item.pair, before: item.before,
       swapLabel: swapped ? `Swapped from ${program.exercises[item.ex].name}` : undefined,
       equip, usesWeight, targets, repsLabel, reason,
       rest: state.restOverrides[ex] ?? (isMain ? 180 : 90),
-      isMain, setup, level, assist, rirExtra,
+      isMain, setup, level, assist, rirExtra, ramp,
       rir: byWeek?.rir ?? program.rirByWeek[week], warmup: !!item.warmup, tag: item.warmup ? item.tag ?? 'Warm-up' : undefined,
     };
   });
