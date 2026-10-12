@@ -5,7 +5,7 @@ import type { Slot } from './engine/schedule';
 import { useWakeLock } from './Gym';
 import { buildRun, runAdjustFor } from './runplan';
 import { AppState, currentSpeeds, RunLog, RunType, today, uid, update, useStore } from './store';
-import { AppBar, Dock, Elapsed, Icon, Sheet, Stepper } from './ui';
+import { AppBar, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
 /** Practice: same screens using a given week's plan, with nothing counted. */
 export function startPracticeRun(state: AppState, type: RunType, week: number) {
@@ -28,10 +28,15 @@ export function startRun(state: AppState, slot: Slot, practice = false, readines
 
 const patch = (id: string, fn: (r: RunLog, s: AppState) => void) => update(s => fn(s.runs.find(r => r.id === id)!, s));
 
-function finish(id: string, answer?: RunLog['answer']) {
+type Wrap = Pick<RunLog, 'conditions' | 'fan' | 'slowedTo'>;
+const CONDITIONS: { value: NonNullable<RunLog['conditions']>; label: string }[] = [{ value: 'cool', label: 'Cool' }, { value: 'warm', label: 'Warm' }, { value: 'hot', label: 'Hot' }];
+const YES_NO = [{ value: 1, label: 'Yes' }, { value: 0, label: 'No' }];
+
+function finish(id: string, answer?: RunLog['answer'], wrap: Wrap = {}) {
   patch(id, (r, s) => {
     r.finishedAt = Date.now();
     r.answer = answer;
+    Object.assign(r, wrap);
     const slot = s.schedule.find(z => z.idx === r.slotIdx);
     if (slot) slot.done = true;
     s.activeRunId = null;
@@ -57,6 +62,11 @@ export function RunSession({ runId }: { runId: string }) {
   const run = state.runs.find(r => r.id === runId)!;
   const [leaving, setLeaving] = useState(false);
   const [asking, setAsking] = useState(false);
+  // Asked once, as the run is finished: both are optional and only feed the coach's read.
+  const [conditions, setConditions] = useState<RunLog['conditions']>();
+  const [fan, setFan] = useState<boolean>();
+  const [slowed, setSlowed] = useState(false);
+  const [slowedTo, setSlowedTo] = useState<number>();
   useWakeLock();
 
   const plan = buildRun(state.program!, run.week, run.type, currentSpeeds(state), run.adjust)!;
@@ -77,7 +87,18 @@ export function RunSession({ runId }: { runId: string }) {
   const workTotal = run.segs.filter(s => s.work).length;
   const workDone = run.segs.filter(s => s.work && s.done).length;
   const allDone = cur < 0;
-  const end = () => (plan.asks ? setAsking(true) : finish(run.id));
+  const end = () => setAsking(true);
+  const main = run.segs.find(s => s.work);
+  const ranAt = main ? main.actual ?? main.prescribed ?? 0 : 0;
+  const slowSpeed = slowedTo ?? Math.round((ranAt - 0.4) * 10) / 10;
+  const wrap = (): Wrap => ({ conditions, fan, slowedTo: !plan.asks && slowed ? slowSpeed : undefined });
+  const step = (d: number) => setSlowedTo(Math.round((slowSpeed + d) * 10) / 10);
+  const conditionFields = (
+    <>
+      <div className="field"><div className="field-label">How warm was it?</div><Segmented options={CONDITIONS} value={conditions ?? null} onChange={v => setConditions(v ?? undefined)} /></div>
+      <div className="field"><div className="field-label">Fan or breeze?</div><Segmented options={YES_NO} value={fan === undefined ? null : fan ? 1 : 0} onChange={v => setFan(v === null ? undefined : v === 1)} /></div>
+    </>
+  );
   const kind = run.type as 'intervals' | 'threshold';
   const speedNow = plan.asks ? currentSpeeds(state)[kind] : 0;
 
@@ -131,7 +152,18 @@ export function RunSession({ runId }: { runId: string }) {
           : <button className="btn primary" onClick={end}>{plan.asks ? 'One question, then finish' : 'Finish run'}</button>}
       </Dock>
 
-      {asking && (
+      {asking && !plan.asks && (
+        <Sheet title="Before you finish" onClose={() => setAsking(false)}>
+          <p className="muted">Optional. These go into the coach's read of this run.</p>
+          {conditionFields}
+          <div className="field"><div className="field-label">Did you slow down part-way to keep your heart rate down?</div>
+            <Segmented options={YES_NO} value={slowed ? 1 : 0} onChange={v => setSlowed(v === 1)} /></div>
+          {slowed && <Stepper label="Slowed to" unit="km/h" value={slowSpeed.toFixed(1)} onMinus={() => step(-0.1)} onPlus={() => step(0.1)} />}
+          <button className="btn primary" onClick={() => finish(run.id, undefined, wrap())}>Save and finish</button>
+          <button className="btn ghost" onClick={() => setAsking(false)}>Back to the run</button>
+        </Sheet>
+      )}
+      {asking && plan.asks && (
         <Sheet title="Could you have done 2 more reps at this speed?" onClose={() => setAsking(false)}>
           <p className="muted">
             {workDone < workTotal
@@ -140,11 +172,12 @@ export function RunSession({ runId }: { runId: string }) {
           </p>
           {workDone === workTotal && (
             <>
-              <button className="btn option" onClick={() => finish(run.id, 'yes')}><b>Yes</b><span className="small muted">Next week goes up to {(speedNow + 0.3).toFixed(1)} km/h</span></button>
-              <button className="btn option" onClick={() => finish(run.id, 'no')}><b>No</b><span className="small muted">Next week stays at {speedNow} km/h</span></button>
+              <button className="btn option" onClick={() => finish(run.id, 'yes', wrap())}><b>Yes</b><span className="small muted">Next week goes up to {(speedNow + 0.3).toFixed(1)} km/h</span></button>
+              <button className="btn option" onClick={() => finish(run.id, 'no', wrap())}><b>No</b><span className="small muted">Next week stays at {speedNow} km/h</span></button>
             </>
           )}
-          <button className="btn option" onClick={() => finish(run.id, 'dnf')}><b>Couldn't finish all reps</b><span className="small muted">Speed stays the same, unless it happens twice in a row</span></button>
+          {conditionFields}
+          <button className="btn option" onClick={() => finish(run.id, 'dnf', wrap())}><b>Couldn't finish all reps</b><span className="small muted">Speed stays the same, unless it happens twice in a row</span></button>
           <button className="btn ghost" onClick={() => setAsking(false)}>Back to the run</button>
         </Sheet>
       )}

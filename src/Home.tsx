@@ -8,6 +8,8 @@ import { mobilityTargetText, mobilityThisWeek } from './Stretch';
 import { buildRun } from './runplan';
 import { EASY_HR_HIGH, EASY_HR_OK } from './engine/running';
 import { easyPace, trendTiles } from './stats';
+import { latestRunForDebrief, reviewToShow, runDebrief } from './coach';
+import { DebriefCard, ReviewCard } from './CoachCards';
 import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
 import { autoGarminSync, requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
 import { Icon, Segmented, Sheet, SyncNowButton } from './ui';
@@ -139,6 +141,14 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
   const travelDays = Array.from({ length: 15 }, (_, i) => addDays(t, i)).filter(d => state.days[d] === 'travel-none');
 
   const pace = p.running ? easyPace(state, t) : null;
+  const lastRun = started ? latestRunForDebrief(state, t) : undefined;
+  const debrief = lastRun ? runDebrief(state, lastRun) : null;
+  const review = started ? reviewToShow(state, t, 'home') : null;
+  // Why the pace card is suggesting what it is, in the order: had to slow, high average, heart rate that kept climbing.
+  const paceWhy = !pace ? '' : pace.why === 'up' ? `All at ${EASY_HR_OK} or under and steady, so there's room to go a little quicker.`
+    : pace.runs.some(r => r.avgHr >= EASY_HR_HIGH) ? `At least one was ${EASY_HR_HIGH} or over, which is too hard for an easy day.`
+    : pace.runs.every(r => r.slowed) ? 'You had to slow down part-way on both to keep them easy.'
+    : `The averages look fine, but heart rate kept climbing during both (${pace.runs.map(r => (r.steady ? `up ${r.steady.driftPct}% to about ${r.steady.lateThird}` : r.slowed ? 'slowed part-way' : `average ${r.avgHr}`)).join('; ')}), so this speed isn't truly easy yet.`;
   const answerPace = (accept: boolean) => update(s => {
     // Stored like every other suggestion: what was offered, when, and whether it was taken.
     s.alerts.push({ id: pace!.evidenceId, kind: 'easy-pace', date: t, status: accept ? 'accepted' : 'ignored' });
@@ -242,8 +252,8 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
           <div className="overline">Suggestion · easy pace</div>
           <b>{pace.why === 'up' ? `Try your next easy run at ${pace.speed.toFixed(1)} km/h` : `Ease your next easy run back to ${pace.speed.toFixed(1)} km/h`}</b>
           <div className="muted">
-            Your last three easy runs at {pace.current} km/h averaged {pace.heartRates.join(', ')} bpm.{' '}
-            {pace.why === 'up' ? `All at ${EASY_HR_OK} or under, so there's room to go a little quicker.` : `At least one was ${EASY_HR_HIGH} or over, which is too hard for an easy day.`}
+            Your last {pace.runs.length === 2 ? 'two' : 'three'} easy runs at {pace.current} km/h averaged {pace.heartRates.join(', ')} bpm.{' '}
+            {paceWhy}
             {pace.why === 'up' ? ` The most easy pace can be right now is ${pace.ceiling.toFixed(1)} km/h.` : ''}
           </div>
           <div className="grid2">
@@ -252,6 +262,9 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
           </div>
         </div>
       )}
+
+      {review && <ReviewCard review={review} />}
+      {debrief && lastRun && <DebriefCard debrief={debrief} compact onOpen={() => onOpen({ slotIdx: lastRun.slotIdx! })} />}
 
       {travelDays.map(d => <TravelCard key={d} state={state} date={d} />)}
       <HeavyGuardCard state={state} />

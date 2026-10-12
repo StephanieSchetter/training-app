@@ -101,6 +101,10 @@ export interface RunLog {
   readiness?: { score: number; accepted: boolean };
   adjust?: RunAdjust;
   speedBefore?: number; speedAfter?: number;
+  /** Asked when the run is finished (12 Oct 2026): how warm it was, and whether there was a fan or breeze. */
+  conditions?: 'cool' | 'warm' | 'hot'; fan?: boolean;
+  /** Easy runs: the speed dropped to part-way, to keep heart rate down. The logged speed stays the one started at. */
+  slowedTo?: number;
   startedAt: number; finishedAt?: number;
 }
 export interface Speeds {

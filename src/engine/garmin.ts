@@ -8,10 +8,14 @@ export interface Activity {
 /** Minutes since midnight from a Garmin local time like "2026-10-01 15:59:01". */
 const clockMinutes = (startLocal: string) => Number(startLocal.slice(11, 13)) * 60 + Number(startLocal.slice(14, 16));
 
-/** Same date and kind; if there are several, the one that started closest to when the session was logged. */
-export function matchActivity<T extends Activity>(acts: T[], date: string, type: 'run' | 'strength', startedAt: number): T | undefined {
+/**
+ * Same date and kind; if there are several, the one that started closest to when the session was logged.
+ * prefer 'longest' takes the longest instead: an easy run whose strides were recorded as their own activity.
+ */
+export function matchActivity<T extends Activity>(acts: T[], date: string, type: 'run' | 'strength', startedAt: number, prefer?: 'longest'): T | undefined {
   const sameDay = acts.filter(a => a.date === date && a.type === type);
   if (sameDay.length < 2) return sameDay[0];
+  if (prefer === 'longest') return sameDay.reduce((best, a) => (a.durationSec > best.durationSec ? a : best));
   const d = new Date(startedAt);
   const logged = d.getHours() * 60 + d.getMinutes();
   return sameDay.reduce((best, a) => (Math.abs(clockMinutes(a.startLocal) - logged) < Math.abs(clockMinutes(best.startLocal) - logged) ? a : best));

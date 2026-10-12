@@ -166,6 +166,11 @@ input:focus, textarea:focus { border-color: var(--accent); }
 
 .stats.four { grid-template-columns: repeat(4, 1fr); } .stats.four > div { padding: 12px 8px; } .stats.four b { font-size: 17px; } .stats.four .overline { font-size: 10px; letter-spacing: .04em; }
 .alert-card { border-color: var(--warn); }
+.coach-notes { display: flex; flex-direction: column; gap: 10px; }
+.coach-note { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--text); }
+.coach-note .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--muted); }
+.coach-note .dot.good { background: var(--accent); } .coach-note .dot.watch { background: var(--warn); }
+.coach-next { font-size: 15px; font-weight: 600; padding-top: 12px; border-top: 1px solid var(--line); }
 .stack.tight { gap: 6px; }
 .stats.old b { color: var(--muted); }
 .roster { gap: 10px; }

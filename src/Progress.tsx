@@ -5,6 +5,8 @@ import { addDays } from './engine/schedule';
 import { mmss } from './engine/running';
 import { easyHrSeries, heldSince, liftChart, liftList, RecoveryKey, recoverySeries, speedSeries, timeTrialSeries, weightSeries } from './stats';
 import { AppState, today } from './store';
+import { reviewToShow } from './coach';
+import { ReviewCard } from './CoachCards';
 import { Icon, Segmented } from './ui';
 
 const RANGES = [{ value: 30, label: '30 days' }, { value: 90, label: '90 days' }, { value: 365, label: '1 year' }];
@@ -65,11 +67,14 @@ export function Progress({ state }: { state: AppState }) {
   const lifts = liftList(state);
   const tt = timeTrialSeries(state);
   const weight = weightSeries(state);
+  const review = reviewToShow(state, t, 'progress');
 
   return (
     <main className="page home progress">
       <h1>Progress</h1>
       <p className="lead small">Trends, not targets. Shaded bands are FIFO stints. Touch a chart to read a value.</p>
+
+      {review && <ReviewCard review={review} />}
 
       <h2>Recovery</h2>
       <Segmented options={RANGES} value={range} onChange={v => v && setRange(v)} />

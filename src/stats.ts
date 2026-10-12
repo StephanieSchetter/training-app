@@ -1,6 +1,6 @@
 // Turns what has been logged into the numbers behind the charts (spec section 11).
-import { matchActivity } from './engine/garmin';
-import { easyPaceSuggestion } from './engine/running';
+import { easyRows, EasyRow, runActivity } from './coach';
+import { easyPaceAdvice } from './engine/coach';
 import { addDays } from './engine/schedule';
 import { AppState, currentSpeeds, RunLog } from './store';
 
@@ -128,7 +128,7 @@ export function easyHrSeries(state: AppState): Series[] {
   const points: Point[] = [];
   for (const r of realRuns(state).filter(isEasy)) {
     const seg = r.segs.find(s => s.work && s.done);
-    const act = matchActivity(state.garminActs, r.date, 'run', r.startedAt);
+    const act = runActivity(state, r);
     if (!seg || !act?.avgHr) continue;
     const speed = seg.actual ?? seg.prescribed!;
     points.push({ x: r.date, y: Math.round(act.avgHr), note: `at ${speed} km/h`, gap: lastSpeed !== undefined && speed !== lastSpeed });
@@ -137,30 +137,29 @@ export function easyHrSeries(state: AppState): Series[] {
   return [{ name: 'Average HR', points }];
 }
 
-export interface EasyPace { current: number; ceiling: number; heartRates: number[]; speed: number; why: 'up' | 'down'; evidenceId: string }
+export interface EasyPace { current: number; ceiling: number; heartRates: number[]; runs: EasyRow[]; speed: number; why: 'up' | 'down'; evidenceId: string }
 
 /**
- * The easy-pace suggestion, if there is one to make: only after a time trial has set a ceiling, and
- * only from easy runs logged at the current easy speed with a matching watch activity.
+ * The easy-pace suggestion, if there is one to make, from easy runs logged at the current easy speed with a
+ * matching watch activity. Easing back can happen at any time. Going quicker is capped by the time-trial
+ * ceiling, or before any time trial by the plan's own easy speed for that week.
  */
 export function easyPace(state: AppState, today: string): EasyPace | null {
-  const ceiling = state.speeds?.easyCeiling;
   const plan = state.program!.running;
-  if (ceiling === undefined || !plan) return null;
+  if (!plan) return null;
   const next = state.schedule.find(s => s.type === 'easy' && !s.done && !s.skipped && s.date >= today);
-  const current = state.speeds?.easy ?? plan.weeks[String(next?.week ?? 0)]?.easy.speed;
-  if (current === undefined) return null;
-  const rows = realRuns(state).filter(isEasy).flatMap(r => {
-    const seg = r.segs.find(s => s.work && s.done);
-    const act = matchActivity(state.garminActs, r.date, 'run', r.startedAt);
-    return seg && act?.avgHr && (seg.actual ?? seg.prescribed) === current ? [{ id: r.id, hr: Math.round(act.avgHr) }] : [];
-  });
-  const s = easyPaceSuggestion(current, ceiling, rows.map(r => r.hr));
+  const planned = plan.weeks[String(next?.week ?? 0)]?.easy.speed;
+  const current = state.speeds?.easy ?? planned;
+  const ceiling = state.speeds?.easyCeiling ?? planned;
+  if (current === undefined || ceiling === undefined) return null;
+  const rows = easyRows(state).filter(r => r.speed === current);
+  const s = easyPaceAdvice(current, ceiling, rows);
   if (!s) return null;
   const evidenceId = `easy-${rows.at(-1)!.id}`;
   // Already answered for this set of runs: wait for the next easy run before suggesting again.
   if (state.alerts.some(a => a.id === evidenceId)) return null;
-  return { current, ceiling, heartRates: rows.slice(-3).map(r => r.hr), ...s, evidenceId };
+  const used = rows.slice(-s.used);
+  return { current, ceiling, heartRates: used.map(r => r.avgHr), runs: used, speed: s.speed, why: s.why, evidenceId };
 }
 
 export function timeTrialSeries(state: AppState): Series[] {

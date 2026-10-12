@@ -5,6 +5,7 @@ import { backExtensionGoWeighted, lateralBendStageUp } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
 import { matchActivity, matchLaps } from './garmin';
+import { easyPaceAdvice, hrBetween, isComfortableEasy, isHardEasy, steadyHr } from './coach';
 import { easyCeiling, easyPaceSuggestion } from './running';
 import { adjustSpeed, mmss, readinessSuggestion, repSeconds, restingHrAlert, timeTrialReset } from './running';
 
@@ -202,5 +203,62 @@ describe('running', () => {
 
   it('1 km at 13.8 takes 4:21', () => {
     expect(mmss(repSeconds(1, 13.8))).toBe('4:21');
+  });
+});
+
+describe('coach: reading an easy run from its laps', () => {
+  // Brad's real runs: 12 Oct (35 min at 10 km/h, 1 km laps) and the 8 Oct baseline (30 min, 9 laps).
+  const oct12 = [[386, 121], [361, 139], [363, 143], [363, 146], [363, 150], [267, 154]].map(([sec, avgHr]) => ({ sec, avgHr }));
+  const oct8 = [124, 136, 140, 142, 145, 148, 153, 157, 157].map(avgHr => ({ sec: 200, avgHr }));
+
+  it('time-weighted heart rate across part of a run', () => {
+    expect(hrBetween(oct12, 386, 386 + 361)).toBeCloseTo(139);
+    expect(hrBetween(oct12, 0, 99999)).toBeNull();
+  });
+
+  it('12 Oct: settles after the first lap, then rises about 6% and finishes around 151', () => {
+    const s = steadyHr(oct12)!;
+    expect([s.early, s.late, s.lateThird, s.minutes]).toEqual([142, 150, 151, 35]);
+    expect(s.driftPct).toBeCloseTo(5.9, 0);
+  });
+
+  it('8 Oct baseline rose more, and strides tacked on the end are cut off', () => {
+    expect(steadyHr(oct8)!.driftPct).toBeGreaterThan(7);
+    const withStrides = [...oct12, { sec: 360, avgHr: 165 }];
+    expect(steadyHr(withStrides, 2103)!.lateThird).toBe(151);
+    expect(steadyHr(withStrides)!.lateThird).toBeGreaterThan(155);
+  });
+
+  it('too few laps or minutes says nothing', () => {
+    expect(steadyHr([{ sec: 2100, avgHr: 141 }])).toBeNull();
+    expect(steadyHr(oct12.slice(0, 3))).toBeNull();
+  });
+
+  it('easy pace: two runs that did not stay easy ease it back, before any time trial', () => {
+    const a = { avgHr: 145, driftPct: 8, lateHr: 156 }, b = { avgHr: 141, driftPct: 5.9, lateHr: 151 };
+    expect(isHardEasy(a) && isHardEasy(b)).toBe(true);
+    expect(easyPaceAdvice(10, 10, [a, b])).toEqual({ speed: 9.8, why: 'down', used: 2 });
+    expect(easyPaceAdvice(10, 10, [b])).toBeNull();
+    // one steady run in between resets it
+    expect(easyPaceAdvice(10, 10, [a, { avgHr: 140, driftPct: 3, lateHr: 144 }])).toBeNull();
+  });
+
+  it('easy pace: slowing down counts as not easy; three steady runs go up, never past the ceiling', () => {
+    const steady = { avgHr: 140, driftPct: 3, lateHr: 144 };
+    expect(isComfortableEasy(steady)).toBe(true);
+    expect(isHardEasy({ ...steady, slowed: true })).toBe(true);
+    expect(easyPaceAdvice(10, 10.7, [steady, steady, steady])).toEqual({ speed: 10.2, why: 'up', used: 3 });
+    expect(easyPaceAdvice(10.6, 10.7, [steady, steady, steady])!.speed).toBe(10.7);
+    expect(easyPaceAdvice(10, 10, [steady, steady, steady])).toBeNull();
+    // averages only (no lap detail) behave as the original rule did
+    expect(easyPaceAdvice(10.4, 11, [{ avgHr: 146 }, { avgHr: 153 }, { avgHr: 147 }])).toEqual({ speed: 10.2, why: 'down', used: 3 });
+  });
+
+  it('the longest activity of the day is the easy run when strides were recorded separately', () => {
+    const act = (id: number, startLocal: string, durationSec: number) => ({ id, type: 'run' as const, startLocal, date: startLocal.slice(0, 10), durationSec, avgHr: null, maxHr: null, laps: [] });
+    const acts = [act(1, '2026-10-12 06:50:07', 2103), act(2, '2026-10-12 07:25:49', 361)];
+    const loggedLate = new Date(2026, 9, 12, 7, 30).getTime();
+    expect(matchActivity(acts, '2026-10-12', 'run', loggedLate)?.id).toBe(2);
+    expect(matchActivity(acts, '2026-10-12', 'run', loggedLate, 'longest')?.id).toBe(1);
   });
 });

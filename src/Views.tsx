@@ -2,6 +2,8 @@
 import { useRef, useState } from 'react';
 import { addDays, isGym, Slot } from './engine/schedule';
 import { matchActivity, matchLaps, Rep } from './engine/garmin';
+import { runDebrief } from './coach';
+import { DebriefCard } from './CoachCards';
 import { schemeText } from './Gym';
 import { ReadinessCard } from './Gym';
 import { applyDoubleUp, heavyBeforeIntervals, shiftFrom, travelOptions } from './engine/schedule';
@@ -29,8 +31,8 @@ export function TypeIcon({ type }: { type: string }) {
 const hms = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 
 /** The watch activity that goes with a logged session, and for interval/threshold runs the heart rate per rep. */
-function GarminCard({ state, date, type, startedAt, reps }: { state: AppState; date: string; type: 'run' | 'strength'; startedAt: number; reps?: Rep[] }) {
-  const act = matchActivity(state.garminActs, date, type, startedAt);
+function GarminCard({ state, date, type, startedAt, reps, prefer }: { state: AppState; date: string; type: 'run' | 'strength'; startedAt: number; reps?: Rep[]; prefer?: 'longest' }) {
+  const act = matchActivity(state.garminActs, date, type, startedAt, prefer);
   const laps = act && reps?.length ? matchLaps(act.laps, reps) : null;
   return (
     <>
@@ -92,6 +94,8 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
     const done = slot ? state.runs.filter(r => r.slotIdx === slot.idx).at(-1) : undefined;
     const ANSWERS = { yes: 'Yes, could have done 2 more reps', no: 'No, that was the limit', dnf: "Couldn't finish all reps" };
     if (done) {
+      const debrief = runDebrief(state, done);
+      const easyDone = done.title.startsWith('Easy');
       return (
         <div className="screen">
           <AppBar title={done.title} sub={`${niceDate(date, true)} · Week ${week}`} left={back} />
@@ -101,6 +105,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
               <div><div className="overline">{done.timeTrial ? '5 km time' : 'Parts done'}</div><b>{done.timeTrial ? (done.timeTrialSec ? `${Math.floor(done.timeTrialSec / 60)}:${String(done.timeTrialSec % 60).padStart(2, '0')}` : '—') : `${done.segs.filter(s => s.done).length} of ${done.segs.length}`}</b></div>
               <div><div className="overline">Next speed</div><b>{done.speedAfter !== undefined ? `${done.speedAfter} km/h` : '—'}</b></div>
             </div>
+            {debrief && <DebriefCard debrief={debrief} />}
             {done.answer && <div className="card"><div className="overline">2 more reps?</div>{ANSWERS[done.answer]}{done.speedBefore !== undefined && done.speedAfter !== undefined ? ` Speed ${done.speedBefore} → ${done.speedAfter} km/h.` : ''}</div>}
             {done.segs.length > 0 && (
               <>
@@ -115,8 +120,8 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
                 </div>
               </>
             )}
-            <GarminCard state={state} date={done.date} type="run" startedAt={done.startedAt}
-              reps={done.type === 'easy' ? undefined : done.segs.filter(s => s.work && s.done && s.km && s.prescribed).map(s => ({ km: s.km!, speed: s.actual ?? s.prescribed! }))} />
+            <GarminCard state={state} date={done.date} type="run" startedAt={done.startedAt} prefer={easyDone ? 'longest' : undefined}
+              reps={easyDone ? undefined : done.segs.filter(s => s.work && s.done && s.km && s.prescribed).map(s => ({ km: s.km!, speed: s.actual ?? s.prescribed! }))} />
           </main>
           {!done.finishedAt && !VIEW_ONLY && <Dock><button className="btn primary" onClick={() => update(s => { s.activeRunId = done.id; })}>Resume this run</button></Dock>}
         </div>
