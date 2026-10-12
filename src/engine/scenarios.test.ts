@@ -100,7 +100,20 @@ describe('gym progression', () => {
   it('straight sets: all at top -> one step, otherwise same', () => {
     const ctx: LiftCtx = { exId: 'curl', equip: 'dumbbell', gym: adelaide, week: 3 };
     expect(suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 10, reps: [10, 10, 10, 10] }], ctx).sets[0].weight).toBe(12.5);
-    expect(suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 10, reps: [10, 10, 10, 9] }], ctx).sets[0].weight).toBe(10);
+    // changed 13 Oct 2026: the first set at the top is enough, as long as the later sets stay in the range
+    const next = (reps: number[], strict = false) => suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 10, reps }], ctx, strict).sets[0].weight;
+    expect(next([10, 10, 10, 9])).toBe(12.5);
+    expect(next([10, 9, 8, 8])).toBe(12.5);
+    expect(next([10, 9, 8, 7])).toBe(10);     // a later set fell out of the range
+    expect(next([9, 10, 10, 10])).toBe(10);   // the first set didn't reach the top
+    expect(next([10, 9, 8])).toBe(10);        // a set was skipped
+    expect(next([12, 11, 10, 9])).toBe(12.5); // going over the top on set one is fine
+    // where every set must reach the top (45° back extension)
+    expect(next([10, 10, 10, 9], true)).toBe(10);
+    expect(next([10, 10, 10, 10], true)).toBe(12.5);
+    // fixed reps (deadlift weeks 1-2, 3 x 8): unchanged, every set must be completed
+    const fixed = (reps: number[]) => suggestStraight(3, [8, 8], [{ gymId: 'adelaide', weight: 70, reps }], { exId: 'deadlift', equip: 'barbell_heavy', gym: adelaide, week: 2 }).sets[0].weight;
+    expect([fixed([8, 8, 8]), fixed([8, 8, 7])]).toEqual([75, 70]);
   });
 });
 

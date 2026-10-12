@@ -106,20 +106,26 @@ export function suggestRpt(scheme: number[], history: PastResult[], ctx: LiftCtx
   return out(r(last.weight), a, 'Miss: repeat the same weight');
 }
 
-/** Straight sets (6.5). range = [x, y]; fixed reps use [n, n]. */
-export function suggestStraight(sets: number, range: [number, number], history: PastResult[], ctx: LiftCtx): Suggestion {
+/**
+ * Straight sets (6.5). range = [x, y]; fixed reps use [n, n].
+ * One step up when the first set reached the top of the range and every later set stayed in the range
+ * (changed 13 Oct 2026: reps fall across sets, so asking for the top on every set only worked when the
+ * first set was far from failure). everySetAtTop keeps the stricter original rule where it was agreed
+ * with the physio (45° back extension).
+ */
+export function suggestStraight(sets: number, range: [number, number], history: PastResult[], ctx: LiftCtx, everySetAtTop = false): Suggestion {
   const targets = Array(sets).fill(range[0]);
   const h = usableHistory(history, ctx);
   const last = h.at(-1);
   if (ctx.week === 1 || !last) return findLoad(history, ctx, targets);
-  const allTop = last.reps.length >= sets && last.reps.every(x => x >= range[1]);
+  const allTop = last.reps.length >= sets && last.reps[0] >= range[1] && last.reps.every(x => x >= (everySetAtTop ? range[1] : range[0]));
   const weight = allTop
     ? oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId)
     : roundNearest(last.weight, ctx.equip, ctx.gym, ctx.exId);
   return {
     kind: 'weights',
     sets: targets.map(reps => ({ weight, reps })),
-    reason: allTop ? 'All sets hit the top: one step up' : 'Same weight',
+    reason: !allTop ? 'Same weight' : everySetAtTop || range[0] === range[1] ? 'All sets hit the top: one step up' : 'First set hit the top and the rest stayed in range: one step up',
   };
 }
 

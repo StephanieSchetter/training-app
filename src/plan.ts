@@ -197,7 +197,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           weight = calm?.sets.find(s => s.setNo === 1 && !s.rampUp && !s.extra)?.weight || null;
           reason = 'Back-flare week: no increase';
         } else if (ready) {
-          const s = suggestStraight(sets, scheme.range, loaded.map(p => p.result), { exId: ex, equip: 'added', gym, week: Math.max(week, 2) });
+          const s = suggestStraight(sets, scheme.range, loaded.map(p => p.result), { exId: ex, equip: 'added', gym, week: Math.max(week, 2) }, true);
           weight = loaded.length ? s.sets[0].weight : 2.5;
           reason = loaded.length ? s.reason : '3 × 12 felt easy: now holding a plate';
         }
