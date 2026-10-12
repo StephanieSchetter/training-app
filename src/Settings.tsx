@@ -76,8 +76,22 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
                     onBlur={e => { const nums = e.target.value.split(/[ ,]+/).map(Number).filter(n => n > 0).sort((a, b) => a - b); patch(x => { x.kettlebells = nums; }); }} />
                 </div>
                 {Object.entries(g.machineSteps).map(([ex, step]) => (
-                  <div className="line" key={ex}><div><div>{name(ex)}</div><div className="muted small">Weight step on this machine</div></div>
+                  <div className="line col" key={ex}>
+                  <div className="row"><div className="grow"><div>{name(ex)}</div><div className="muted small">Weight step on this machine</div></div>
                     <Mini label={`${name(ex)} step`} value={`${step} kg`} onMinus={() => patch(x => { x.machineSteps[ex] = Math.max(0.5, round(step - 0.5, 0.5)); })} onPlus={() => patch(x => { x.machineSteps[ex] = round(step + 0.5, 0.5); })} />
+                  </div>
+                  <div className="muted small">If the step changes higher up the stack, enter where and the new step. Leave both empty if it doesn't.</div>
+                  <div className="grid2">
+                    {(['from', 'step'] as const).map(k => (
+                      <input key={k + (g.machineChange?.[ex]?.[k] ?? '')} inputMode="decimal" aria-label={`${name(ex)} ${k === 'from' ? 'step changes at' : 'step above that'}`}
+                        defaultValue={g.machineChange?.[ex]?.[k] ?? ''} placeholder={k === 'from' ? 'Changes at (kg)' : 'Step above that'}
+                        onBlur={e => { const n = Number(e.target.value); patch(x => {
+                          const cur = { from: 0, step: 0, ...(x.machineChange?.[ex] ?? {}), [k]: n > 0 ? n : 0 };
+                          x.machineChange = { ...(x.machineChange ?? {}) };
+                          if (cur.from > 0 || cur.step > 0) x.machineChange[ex] = cur; else delete x.machineChange[ex];
+                        }); }} />
+                    ))}
+                  </div>
                   </div>
                 ))}
                 {Object.keys(g.machineSteps).length === 0 && <div className="line muted small">No machines used here yet.</div>}

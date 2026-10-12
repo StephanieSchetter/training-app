@@ -1,6 +1,6 @@
 // Gym session flow (spec 5.2): start -> warm-up -> one exercise per screen -> finish.
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { gridStep, roundNearest } from './engine/weights';
+import { nudge, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
@@ -454,6 +454,11 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
 
 function SetupCard({ item, gymId, gymName, dock }: { item: PlanItem; gymId: string; gymName: string; dock: ReactNode }) {
   const [v, setV] = useState('');
+  // Some stacks change step part-way up (5s to 60 kg, then 10s). Optional, asked with the step.
+  const [changes, setChanges] = useState(false);
+  const [from, setFrom] = useState('');
+  const [then, setThen] = useState('');
+  const changeOk = !changes || (Number(from) > 0 && Number(then) > 0);
   const q = item.setup === 'machine'
     ? (item.info.plateLoaded ? 'What is the smallest weight jump you can make on this machine?' : 'What is the weight step on this machine?')
     : item.setup === 'plate' ? 'What is the smallest barbell plate here?' : 'Which kettlebell sizes are here?';
@@ -464,7 +469,10 @@ function SetupCard({ item, gymId, gymName, dock }: { item: PlanItem; gymId: stri
     if (!nums.length) return;
     update(s => {
       const g = s.profiles.find(p => p.id === gymId)!;
-      if (item.setup === 'machine') g.machineSteps[item.ex] = nums[0];
+      if (item.setup === 'machine') {
+        g.machineSteps[item.ex] = nums[0];
+        if (changes && changeOk) g.machineChange = { ...(g.machineChange ?? {}), [item.ex]: { from: Number(from), step: Number(then) } };
+      }
       else if (item.setup === 'plate') g.smallestPlate = nums[0];
       else g.kettlebells = nums.sort((a, b) => a - b);
     });
@@ -475,11 +483,22 @@ function SetupCard({ item, gymId, gymName, dock }: { item: PlanItem; gymId: stri
         <div className="overline">One quick question · {gymName} gym</div>
         <div className="q">{q}</div>
         <div className="muted small">{hint}</div>
-        {quick.length > 0 && <div className="grid4">{quick.map(x => <button className="btn" key={x} onClick={() => save(x)}>{x}</button>)}</div>}
+        {quick.length > 0 && <div className="grid4">{quick.map(x => <button className={'btn' + (changes && v === x ? ' primary' : '')} key={x} onClick={() => (changes ? setV(x) : save(x))}>{x}</button>)}</div>}
         <input inputMode={item.setup === 'kettlebell' ? 'text' : 'decimal'} value={v} onChange={e => setV(e.target.value)} placeholder={item.setup === 'kettlebell' ? '8, 12, 16, 20' : 'Another number'} />
+        {item.setup === 'machine' && !changes && <button className="btn ghost" onClick={() => setChanges(true)}>The step changes higher up the stack</button>}
+        {item.setup === 'machine' && changes && (
+          <>
+            <div className="muted small">Enter the step for the lighter part above, then where it changes. For example: 5 kg steps up to 60 kg, then 10 kg steps.</div>
+            <div className="grid2">
+              <input inputMode="decimal" aria-label="Step changes from" value={from} onChange={e => setFrom(e.target.value)} placeholder="Changes at (kg)" />
+              <input inputMode="decimal" aria-label="Step above that" value={then} onChange={e => setThen(e.target.value)} placeholder="Step above that" />
+            </div>
+            <button className="btn ghost" onClick={() => setChanges(false)}>It's the same step all the way up</button>
+          </>
+        )}
         <div className="muted small">Asked once per gym. You can change it later in Settings.</div>
       </div>
-      <Dock>{dock}<button className="btn primary" disabled={!v.trim()} onClick={() => save(v)}>Save and continue</button></Dock>
+      <Dock>{dock}<button className="btn primary" disabled={!v.trim() || !changeOk} onClick={() => save(v)}>Save and continue</button></Dock>
     </>
   );
 }
@@ -518,8 +537,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       const at = i < 0 ? bells.length - 1 : i;
       return setWeight(bells[Math.max(0, Math.min(bells.length - 1, bells[at] === weight ? at + dir : dir > 0 ? at : at - 1))]);
     }
-    const s = gridStep(item.equip, gym, item.ex) ?? 2.5;
-    setWeight(w => Math.max(0, Math.round(((w ?? 0) + dir * s) * 100) / 100));
+    setWeight(w => nudge(w ?? 0, dir > 0 ? 1 : -1, item.equip, gym, item.ex));
   };
 
   const save = (rampUp: boolean) => {

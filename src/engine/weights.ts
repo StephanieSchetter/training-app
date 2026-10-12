@@ -12,6 +12,8 @@ export interface GymProfile {
   kettlebells: number[];
   /** Stack step per machine exercise id, asked on first use. */
   machineSteps: Record<string, number>;
+  /** Machines whose step changes part-way up the stack: machineSteps up to `from` kg, then `step` above it. */
+  machineChange?: Record<string, { from: number; step: number }>;
 }
 
 const EPS = 1e-9;
@@ -30,8 +32,21 @@ export function gridStep(equip: Equip, gym: GymProfile, exId: string): number | 
   }
 }
 
+/** A machine stack with two step sizes, e.g. 5 kg steps up to 60 kg and 10 kg steps above. Null for an even stack. */
+function stack(equip: Equip, gym: GymProfile, exId: string): { step: number; from: number; then: number } | null {
+  const step = gym.machineSteps[exId];
+  const c = gym.machineChange?.[exId];
+  return equip === 'machine' && step && c && c.from > 0 && c.step > 0 ? { step, from: c.from, then: c.step } : null;
+}
+
 /** Round to the nearest available weight; an exact tie goes to the lighter one. */
 export function roundNearest(w: number, equip: Equip, gym: GymProfile, exId: string): number {
+  const k = stack(equip, gym, exId);
+  if (k) {
+    return w <= k.from
+      ? Math.min(k.from, tidy(Math.ceil(w / k.step - 0.5 - EPS) * k.step))
+      : tidy(k.from + Math.ceil((w - k.from) / k.then - 0.5 - EPS) * k.then);
+  }
   if (equip === 'kettlebell') {
     const bells = [...gym.kettlebells].sort((a, b) => a - b);
     if (!bells.length) return w;
@@ -47,6 +62,8 @@ export function roundDown(w: number, equip: Equip, gym: GymProfile, exId: string
     const below = gym.kettlebells.filter(b => b <= w + EPS);
     return below.length ? Math.max(...below) : w;
   }
+  const k = stack(equip, gym, exId);
+  if (k) return w < k.from ? tidy(Math.floor(w / k.step + EPS) * k.step) : tidy(k.from + Math.floor((w - k.from) / k.then + EPS) * k.then);
   const s = gridStep(equip, gym, exId);
   if (!s) return w;
   return tidy(Math.floor(w / s + EPS) * s);
@@ -58,12 +75,31 @@ export function oneStepUp(w: number, equip: Equip, gym: GymProfile, exId: string
     const above = gym.kettlebells.filter(b => b > w + EPS);
     return above.length ? Math.min(...above) : w;
   }
+  const k = stack(equip, gym, exId);
+  if (k) {
+    return w < k.from - EPS
+      ? Math.min(k.from, tidy((Math.floor(w / k.step + EPS) + 1) * k.step))
+      : tidy(k.from + (Math.floor((w - k.from) / k.then + EPS) + 1) * k.then);
+  }
   const s = gridStep(equip, gym, exId);
   if (!s) return w;
   if (equip === 'barbell_heavy') return roundNearest(w + HEAVY_STEP, equip, gym, exId);
   if (equip === 'barbell') return roundNearest(w + s, equip, gym, exId);
   // dumbbells and machines: next weight that exists above the last one
   return tidy((Math.floor(w / s + EPS) + 1) * s);
+}
+
+/** The weight one tap of plus or minus moves to on the set screen. Uneven machine stacks follow their own positions. */
+export function nudge(w: number, dir: 1 | -1, equip: Equip, gym: GymProfile, exId: string): number {
+  const k = stack(equip, gym, exId);
+  if (k && dir > 0) return oneStepUp(w, equip, gym, exId);
+  if (k) {
+    return w > k.from + EPS
+      ? Math.max(k.from, tidy(k.from + (Math.ceil((w - k.from) / k.then - EPS) - 1) * k.then))
+      : Math.max(0, tidy((Math.ceil(w / k.step - EPS) - 1) * k.step));
+  }
+  const s = gridStep(equip, gym, exId) ?? 2.5;
+  return Math.max(0, Math.round((w + dir * s) * 100) / 100);
 }
 
 function tidy(n: number): number {

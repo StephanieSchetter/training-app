@@ -1,6 +1,6 @@
 // Spec section 14 test scenarios that are pure rules (no screens, no network).
 import { describe, expect, it } from 'vitest';
-import { GymProfile } from './weights';
+import { GymProfile, nudge, oneStepUp, roundDown, roundNearest } from './weights';
 import { backExtensionGoWeighted, lateralBendStageUp } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
@@ -203,6 +203,37 @@ describe('running', () => {
 
   it('1 km at 13.8 takes 4:21', () => {
     expect(mmss(repSeconds(1, 13.8))).toBe('4:21');
+  });
+});
+
+describe('machines whose step changes part-way up the stack', () => {
+  // 5 kg steps up to 60 kg, then 10 kg steps
+  const gym: GymProfile = { ...adelaide, machineSteps: { lat_pulldown: 5 }, machineChange: { lat_pulldown: { from: 60, step: 10 } } };
+  const at = (w: number) => roundNearest(w, 'machine', gym, 'lat_pulldown');
+  const up = (w: number) => oneStepUp(w, 'machine', gym, 'lat_pulldown');
+
+  it('rounds to a pin that exists on either side of the change', () => {
+    expect([42, 58, 63, 65, 66, 74, 76].map(at)).toEqual([40, 60, 60, 60, 70, 70, 80]);
+    expect(roundDown(69, 'machine', gym, 'lat_pulldown')).toBe(60);
+    expect(roundDown(57, 'machine', gym, 'lat_pulldown')).toBe(55);
+  });
+
+  it('one step up is 5 below the change and 10 above it', () => {
+    expect([50, 55, 60, 70].map(up)).toEqual([55, 60, 70, 80]);
+  });
+
+  it('plus and minus on the set screen follow the stack', () => {
+    const tap = (w: number, d: 1 | -1) => nudge(w, d, 'machine', gym, 'lat_pulldown');
+    expect([tap(55, 1), tap(60, 1), tap(70, -1), tap(60, -1), tap(5, -1), tap(0, -1)]).toEqual([60, 70, 60, 55, 0, 0]);
+    // an even stack and free weights are unchanged
+    expect(nudge(40, 1, 'machine', adelaide, 'leg_curl')).toBe(45);
+    expect(nudge(20, -1, 'dumbbell', adelaide, 'db_bench')).toBe(17.5);
+  });
+
+  it('a suggestion crossing the change uses the bigger step, and back-off sets land on real pins', () => {
+    const ctx: LiftCtx = { exId: 'lat_pulldown', equip: 'machine', gym, week: 3 };
+    const s = suggestRpt([8, 10, 12], [{ gymId: 'adelaide', weight: 60, reps: [10, 12, 12] }], ctx);
+    expect(weights(s)).toEqual([70, 60, 55]);
   });
 });
 

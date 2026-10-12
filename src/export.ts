@@ -66,7 +66,7 @@ export function tables(s: AppState): Sheet[] {
     { name: 'FIFO stints', head: ['Location', 'First day', 'Last day', 'Gym profile'], rows: s.stints.map(x => [x.location, x.start, x.end, x.gym]) },
     { name: 'Shifts', head: ['Date', 'Shift or travel'], rows: Object.entries(s.days).sort().map(([d, v]) => [d, v]) },
     { name: 'Gym profiles', head: ['Gym', 'Dumbbell step kg', 'Smallest plate kg', 'Kettlebells kg'], rows: s.profiles.map(g => [g.name, g.dumbbellStep, g.smallestPlate, g.kettlebells.join(', ')]) },
-    { name: 'Machine steps', head: ['Gym', 'Machine', 'Step kg'], rows: s.profiles.flatMap(g => Object.entries(g.machineSteps).map(([ex, step]) => [g.name, exName(ex), step])) },
+    { name: 'Machine steps', head: ['Gym', 'Machine', 'Step kg', 'Step changes at kg', 'Step above that kg'], rows: s.profiles.flatMap(g => Object.entries(g.machineSteps).map(([ex, step]) => [g.name, exName(ex), step, g.machineChange?.[ex]?.from, g.machineChange?.[ex]?.step])) },
     { name: 'Rest times', head: ['Exercise', 'Rest (sec)'], rows: Object.entries(s.restOverrides).map(([ex, v]) => [exName(ex), v]) },
     { name: 'Evening stretch', head: ['Date', 'Stretches ticked', 'Done'], rows: Object.entries(s.stretch).sort().map(([d, v]) => [d, v.length, yn(v.length >= p.stretches.length)]) },
     { name: 'Physio findings', head: ['Applies from', 'Finding'], rows: s.physio.map(f => [f.date, f.text]) },
