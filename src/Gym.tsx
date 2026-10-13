@@ -462,7 +462,7 @@ function SetupCard({ item, gymId, gymName, dock }: { item: PlanItem; gymId: stri
   const q = item.setup === 'machine'
     ? (item.info.plateLoaded ? 'What is the smallest weight jump you can make on this machine?' : 'What is the weight step on this machine?')
     : item.setup === 'plate' ? 'What is the smallest barbell plate here?' : 'Which kettlebell sizes are here?';
-  const hint = item.setup === 'machine' && item.info.plateLoaded ? 'In kg, in total. For example 2.5 if the smallest plates are 1.25 kg and you add one each side.' : item.setup === 'machine' ? 'In kg. The gap between one pin position and the next.' : item.setup === 'plate' ? 'In kg, for a single plate.' : 'In kg, separated by commas. For example: 8, 12, 16, 20';
+  const hint = item.setup === 'machine' && item.info.perSide ? 'In kg, on one side. For example 2.5 if the smallest plate you would add to one arm is 2.5 kg.' : item.setup === 'machine' && item.info.plateLoaded ? 'In kg, in total. For example 2.5 if the smallest plates are 1.25 kg and you add one each side.' : item.setup === 'machine' ? 'In kg. The gap between one pin position and the next.' : item.setup === 'plate' ? 'In kg, for a single plate.' : 'In kg, separated by commas. For example: 8, 12, 16, 20';
   const quick = item.setup === 'machine' ? ['2.5', '5', '7', '10'] : item.setup === 'plate' ? ['0.5', '1', '1.25', '2.5'] : [];
   const save = (raw: string) => {
     const nums = raw.split(/[ ,]+/).map(Number).filter(n => n > 0);
@@ -621,7 +621,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       </div>
 
       {item.usesWeight && (
-        <Stepper label="Weight" unit={item.equip === 'added' ? 'kg added' : item.equip === 'dumbbell' ? 'kg each' : 'kg'} value={weight} onMinus={() => bump(-1)} onPlus={() => bump(1)} onType={setWeight} />
+        <Stepper label="Weight" unit={item.equip === 'added' ? 'kg added' : item.equip === 'dumbbell' ? 'kg each' : item.info.perSide ? 'kg each side' : 'kg'} value={weight} onMinus={() => bump(-1)} onPlus={() => bump(1)} onType={setWeight} />
       )}
       <Stepper label={unit === 'reps' ? 'Reps' : 'Distance'} unit={unit} value={reps} onMinus={() => setReps(r => Math.max(0, r - 1))} onPlus={() => setReps(r => r + 1)} />
 

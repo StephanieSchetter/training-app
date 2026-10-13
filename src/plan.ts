@@ -308,6 +308,15 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       reason = 'Starting weight from your program';
     }
 
+    // A weight agreed at a review stands in for the suggestion until the lift is next done. After that,
+    // progression carries on from whatever was actually logged.
+    const agreed = program.coachWeights?.find(c => c.ex === ex && (!c.gym || c.gym === gym.id));
+    if (agreed && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
+      const w = roundNearest(agreed.kg, equip, gym, ex);
+      targets = scheme.t === 'rpt' ? rptSets(w, targets.map(t => t.reps), targets[0].reps, ctx()) : targets.map(t => ({ ...t, weight: w }));
+      reason = `Agreed at your review on ${new Date(agreed.from + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
+    }
+
     // Week 8: half the sets at week 7's weights; nothing here feeds progression.
     if (deload && scheme.t !== 'pullup') {
       const last = usableHistory(history, ctx()).at(-1);

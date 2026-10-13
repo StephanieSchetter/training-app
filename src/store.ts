@@ -23,6 +23,8 @@ export const DROP = '__drop';
 
 export interface Exercise {
   name: string; equip: Equip; eachSide?: boolean; plateLoaded?: boolean;
+  /** A machine with a separate arm each side: the weight logged is what is on one side. */
+  perSide?: boolean;
   tags?: string[]; main?: string[]; helper?: string[]; note?: string;
 }
 export interface ProgramItem {
@@ -49,6 +51,8 @@ export interface Program {
   sessions: Record<string, { name: string; note?: string; items: ProgramItem[] }>;
   swaps: { when: string; from: string; to: string; label: string }[];
   legRaiseLevels: { level: number; name: string; sets: number; range: [number, number] }[];
+  /** Weights agreed at a review: used instead of the suggestion until the lift is next done after `from` (at that gym, if named). */
+  coachWeights?: { ex: string; kg: number; gym?: string; from: string }[];
   stints: Stint[]; days: Record<string, string>; doubleUps: string[];
   running?: RunningPlan;
 }
