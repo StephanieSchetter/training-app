@@ -16,6 +16,9 @@ on:
       days:
         description: 'Days of history to pull (3 for a normal run, 365 for the first load)'
         default: '3'
+      probe:
+        description: 'One-off check of where Garmin keeps food data (prints field names only)'
+        default: 'no'
 
 permissions:
   contents: read
@@ -34,7 +37,8 @@ jobs:
         with:
           python-version: '3.13'
       - run: pip install --quiet garminconnect==0.3.17 requests
-      - run: python garmin/sync.py
+      - run: python garmin/${{ inputs.probe == 'yes' && 'probe.py' || 'sync.py' }}
+        working-directory: .
         env:
           SUPABASE_URL: https://cycpaeykmufxxkhmrvdf.supabase.co
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
