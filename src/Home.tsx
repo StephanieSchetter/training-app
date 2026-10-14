@@ -8,6 +8,7 @@ import { mobilityTargetText, mobilityThisWeek } from './Stretch';
 import { buildRun } from './runplan';
 import { EASY_HR_HIGH, EASY_HR_OK } from './engine/running';
 import { easyPace, trendTiles } from './stats';
+import { energyView } from './nutrition';
 import { latestRunForDebrief, reviewToShow, runDebrief } from './coach';
 import { DebriefCard, ReviewCard } from './CoachCards';
 import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
@@ -108,12 +109,16 @@ function CheckinOffers({ state }: { state: AppState }) {
 export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: AppState; sync: SyncView; onOpen: (t: Target) => void; onStretch: () => void; onProgress: () => void }) {
   const [confirmWipe, setConfirmWipe] = useState(false);
   const [kg, setKg] = useState('');
+  const [protein, setProtein] = useState('');
   const p = state.program!;
   const t = today();
   const stretched = (state.stretch[t] ?? []).length;
-  // Body weight is asked for once a week (5.1).
+  // Body weight is asked for every morning (changed from weekly on 14 Oct 2026, for the calorie estimate).
   const lastWeight = [...state.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const weightDue = !lastWeight || daysBetween(lastWeight.date, t) >= 7;
+  const weightDue = !state.weights.some(w => w.date === t);
+  const yesterday = addDays(t, -1);
+  const energy = energyView(state, t);
+  const fmt = (n: number) => n.toLocaleString('en-AU');
   const started = t >= p.start;
   const todays = state.schedule.filter(s => s.date === t && !s.skipped).sort((a, b) => a.order - b.order);
   const upcoming = state.schedule.filter(s => s.date > t && !s.done && !s.skipped).slice(0, 7);
@@ -332,15 +337,40 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
 
       {weightDue && !VIEW_ONLY && (
         <div className="card">
-          <div className="overline">Weekly body weight</div>
-          <div className="muted small">{lastWeight ? `Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : 'Nothing entered yet. One number a week is enough to track the trend.'}</div>
-          <div className="row">
-            <input inputMode="decimal" aria-label="Body weight in kg" value={kg} placeholder={lastWeight ? String(lastWeight.kg) : 'kg'} onChange={e => setKg(e.target.value)} />
-            <button className="btn primary fit" disabled={!(Number(kg) > 20 && Number(kg) < 300)} onClick={() => {
-              update(s => { s.weights = [...s.weights.filter(w => w.date !== t), { date: t, kg: Math.round(Number(kg) * 10) / 10 }]; });
-              setKg('');
-            }}>Save</button>
+          <div className="overline">Morning weigh-in</div>
+          <div className="muted small">First thing, after the toilet, before food or drink, same scale. Daily ups and downs are normal; the app follows the trend.{lastWeight ? ` Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : ''}</div>
+          <input inputMode="decimal" aria-label="Body weight in kg" value={kg} placeholder={lastWeight ? `${lastWeight.kg} kg` : 'kg'} onChange={e => setKg(e.target.value)} />
+          {state.nutrition.protein[yesterday] === undefined && (
+            <input inputMode="numeric" aria-label="Yesterday's protein in grams" value={protein} placeholder="Yesterday's protein in g (optional, from MyFitnessPal)" onChange={e => setProtein(e.target.value)} />
+          )}
+          <button className="btn primary" disabled={!(Number(kg) > 20 && Number(kg) < 300)} onClick={() => {
+            update(s => {
+              s.weights = [...s.weights.filter(w => w.date !== t), { date: t, kg: Math.round(Number(kg) * 10) / 10 }];
+              if (Number(protein) > 0 && Number(protein) < 600) s.nutrition = { ...s.nutrition, protein: { ...s.nutrition.protein, [yesterday]: Math.round(Number(protein)) } };
+            });
+            setKg(''); setProtein('');
+          }}>Save</button>
+        </div>
+      )}
+
+      {started && energy.maintenance && (
+        <div className="card">
+          <div className="overline">Calories · from your data</div>
+          <b>Maintenance about {fmt(energy.maintenance.kcal)} kcal a day{energy.maintenance.source === 'garmin' ? " (Garmin's estimate for now)" : ''}</b>
+          <div className="muted small">
+            {energy.maintenance.source === 'measured'
+              ? `Likely between ${fmt(energy.maintenance.low)} and ${fmt(energy.maintenance.high)}. Worked out from ${energy.maintenance.intakeDays} days of food logging and ${energy.maintenance.weighIns} weigh-ins: you averaged ${fmt(energy.maintenance.avgIntake!)} kcal while your weight trend moved ${energy.maintenance.kgPerWeek! > 0 ? '+' : ''}${energy.maintenance.kgPerWeek} kg a week.${energy.maintenance.garminAvg ? ` Garmin's estimate for the same days was ${fmt(energy.maintenance.garminAvg)}.` : ''}`
+              : `Garmin's figure can be 10–20% out for one person. With 14 days of food logging and daily weigh-ins, the app works out your real number from how your weight responds. So far: ${energy.maintenance.intakeDays} full days logged, ${energy.maintenance.weighIns} weigh-ins.`}
           </div>
+          {energy.targets && (
+            <div className="stats">
+              <div><div className="overline">Lose fat</div><b>{fmt(energy.targets.lose)}</b></div>
+              <div><div className="overline">Maintain</div><b>{fmt(energy.targets.maintain)}</b></div>
+              <div><div className="overline">Build muscle</div><b>{fmt(energy.targets.gain)}</b></div>
+            </div>
+          )}
+          {energy.targets && <div className="muted small">Lose fat is about 0.5% of body weight a week; build muscle is a small surplus, about 0.25% a week. Protein: about {energy.targets.proteinG} g a day (2 g per kg at {energy.weight!.toFixed(1)} kg).</div>}
+          {energy.last7.intake !== null && <div className="small">Last 7 days: {fmt(energy.last7.intake)} kcal a day on average ({energy.last7.days} logged){energy.last7.protein !== null ? `, ${energy.last7.protein} g protein (${energy.last7.proteinDays} entered)` : ''}.</div>}
         </div>
       )}
 

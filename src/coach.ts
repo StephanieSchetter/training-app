@@ -229,6 +229,13 @@ export function weeklyReview(state: AppState, week: number, today: string): Week
   const worse = state.checkins.filter(c => gym.some(s => s.id === c.sessionId) && (c.knee === 'worse' || c.back === 'worse')).length;
   if (gym.length) notes.push({ tone: worse ? 'watch' : 'info', text: `Gym: ${gym.length} session${gym.length > 1 ? 's' : ''}, ${sets} sets logged.${worse ? ` Knee or back was worse the next morning ${worse === 1 ? 'once' : `${worse} times`}.` : ''}` });
 
+  const eaten = Array.from({ length: 7 }, (_, i) => state.garminDays[addDays(from, i)]?.kcalIn).filter((k): k is number => k != null && k >= 1200);
+  const scale = state.weights.filter(w => inWeek(w.date)).sort((a, b) => a.date.localeCompare(b.date));
+  if (eaten.length || scale.length) {
+    const avgEaten = eaten.length ? Math.round(avg(eaten)! / 10) * 10 : null;
+    notes.push({ tone: 'info', text: `Food and weight: ${avgEaten !== null ? `${avgEaten.toLocaleString('en-AU')} kcal a day on ${eaten.length} logged day${eaten.length === 1 ? '' : 's'}` : 'no food logged'}; ${scale.length ? `${scale.length} weigh-in${scale.length === 1 ? '' : 's'}${scale.length >= 2 ? `, ${scale[0].kg} to ${scale.at(-1)!.kg} kg` : ''}` : 'no weigh-ins'}.` });
+  }
+
   const mob = mobilityThisWeek(state, from);
   const target = p.mobilityTarget ?? [4, 5];
   notes.push({ tone: mob >= target[0] ? 'good' : complete ? 'watch' : 'info', text: `Mobility: ${mob} evening${mob === 1 ? '' : 's'}, target ${mobilityTargetText(state)}.` });

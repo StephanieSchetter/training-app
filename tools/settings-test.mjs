@@ -30,11 +30,11 @@ const click = async (label, nth = 0) => {
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-13', { waitUntil: 'networkidle0' });
 await wait(200);
 
-// Weekly body weight
-check('Body weight is asked for when none has been entered', /weekly body weight/i.test(await text()));
+// Morning weigh-in (daily from 14 Oct 2026)
+check('Body weight is asked for when none has been entered today', /morning weigh-in/i.test(await text()));
 await page.type('input[aria-label="Body weight in kg"]', '82.4');
 await click('Save');
-check('Saving it removes the prompt for the week', !/weekly body weight/i.test(await text()));
+check('Saving it removes the prompt for the day', !/morning weigh-in/i.test(await text()));
 
 // Evening stretch
 await click('Evening mobility');

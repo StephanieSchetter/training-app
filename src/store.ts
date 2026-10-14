@@ -168,7 +168,11 @@ export function currentSpeeds(s: AppState): Speeds {
   return s.speeds ?? { intervals: p.intervals, threshold: p.threshold, strides: p.strides };
 }
 
-export interface GarminDay { date: string; restingHr: number | null; hrv: number | null; sleepHours: number | null; sleepScore: number | null; readiness: number | null; trainingLoad: number | null }
+export interface GarminDay {
+  date: string; restingHr: number | null; hrv: number | null; sleepHours: number | null; sleepScore: number | null; readiness: number | null; trainingLoad: number | null;
+  /** From 14 Oct 2026: steps, Garmin's calorie-burn estimate, and calories eaten as logged in MyFitnessPal (linked to Garmin). */
+  steps?: number | null; kcalOut?: number | null; kcalActive?: number | null; kcalBmr?: number | null; kcalIn?: number | null;
+}
 export interface GarminActivity {
   id: number; type: 'run' | 'strength'; startLocal: string; date: string; durationSec: number;
   avgHr: number | null; maxHr: number | null; trainingLoad: number | null; distanceKm: number;
@@ -179,6 +183,8 @@ export interface GarminStatus { ok: boolean; lastSync?: string; lastAttempt?: st
 export interface AppState {
   /** Body weight, typed in weekly. One entry per date. */
   weights: { date: string; kg: number }[];
+  /** Protein eaten per day in grams, typed in from MyFitnessPal (Garmin only passes on calories). */
+  nutrition: { protein: Record<string, number> };
   /** Evening stretch: which of the six were ticked, per date. */
   stretch: Record<string, number[]>;
   physio: { id: string; date: string; text: string }[];
@@ -220,7 +226,7 @@ function fresh(): AppState {
     runs: [], speeds: null, alerts: [], activeRunId: null,
     garminDays: {}, garminActs: [], garminStatus: null,
     checkins: [], reductions: [], tempSwaps: [], notices: [],
-    weights: [], stretch: {}, physio: [],
+    weights: [], stretch: {}, physio: [], nutrition: { protein: {} },
   };
 }
 

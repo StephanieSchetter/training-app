@@ -6,6 +6,7 @@ import { rampSets } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
 import { matchActivity, matchLaps, matchRepLaps } from './garmin';
+import { EnergyDay, estimateMaintenance, targets, trendWeights } from './energy';
 import { easyPaceAdvice, hrBetween, isComfortableEasy, isHardEasy, steadyHr } from './coach';
 import { easyCeiling, easyPaceSuggestion } from './running';
 import { adjustSpeed, mmss, readinessSuggestion, repSeconds, restingHrAlert, timeTrialReset } from './running';
@@ -297,6 +298,39 @@ describe('machines whose step changes part-way up the stack', () => {
     const ctx: LiftCtx = { exId: 'lat_pulldown', equip: 'machine', gym, week: 3 };
     const s = suggestRpt([8, 10, 12], [{ gymId: 'adelaide', weight: 60, reps: [10, 12, 12] }], ctx);
     expect(weights(s)).toEqual([70, 60, 55]);
+  });
+});
+
+describe('calories from weight and food', () => {
+  const days = (n: number, f: (i: number) => Partial<EnergyDay>) => Array.from({ length: n }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10);
+    return { date: d, ...f(i) };
+  });
+
+  it('measured: eating 2,600 while losing 0.35 kg a week means maintenance about 2,985', () => {
+    const d = days(28, i => ({ weight: 96 - 0.05 * i + (i % 2 ? 0.3 : -0.3), kcalIn: 2600 + (i % 3 - 1) * 150, kcalOut: 3100 }));
+    const m = estimateMaintenance(d)!;
+    expect(m.source).toBe('measured');
+    expect(Math.abs(m.kcal - (2600 + 0.05 * 7700))).toBeLessThan(60);
+    expect(m.low).toBeLessThan(m.kcal);
+    expect(m.high).toBeGreaterThan(m.kcal);
+    expect(m.kgPerWeek).toBeCloseTo(-0.35, 1);
+    expect(m.garminAvg).toBe(3100);
+  });
+
+  it('not enough yet: Garmin\'s average burn with a wide band, and part-logged days are ignored', () => {
+    const d = days(6, i => ({ weight: i < 2 ? 96 : null, kcalIn: i === 3 ? 780 : 2700, kcalOut: i === 5 ? 1665 - 300 : 2900 }));
+    const m = estimateMaintenance(d)!;
+    expect([m.source, m.kcal, m.low, m.high, m.intakeDays, m.weighIns]).toEqual(['garmin', 2900, 2470, 3330, 5, 2]);
+    expect(estimateMaintenance([])).toBeNull();
+  });
+
+  it('trend weight moves a tenth of the way each weigh-in', () => {
+    expect(trendWeights([{ date: 'a', weight: 96 }, { date: 'b' }, { date: 'c', weight: 97 }]).map(t => t.trend)).toEqual([96, 96, 96.1]);
+  });
+
+  it('targets: lose about 0.5% a week, gain about 0.25%, protein 2 g/kg', () => {
+    expect(targets(2900, 96)).toEqual({ lose: 2370, maintain: 2900, gain: 3160, proteinG: 190 });
   });
 });
 

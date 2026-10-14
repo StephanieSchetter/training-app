@@ -18,7 +18,7 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 32;
+export const APP_VERSION = 33;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -76,6 +76,7 @@ function localRecords(s: AppState): Map<string, Rec> {
     add('meta', 'tempSwaps', s.tempSwaps);
     add('meta', 'notices', s.notices);
     add('meta', 'weights', s.weights);
+    add('meta', 'nutrition', s.nutrition);
     add('meta', 'stretch', s.stretch);
     add('meta', 'physio', s.physio);
   }
@@ -132,6 +133,7 @@ function applyRemote(s: AppState, r: Rec & { deleted: boolean }) {
     else if (r.id === 'tempSwaps') s.tempSwaps = r.data as AppState['tempSwaps'];
     else if (r.id === 'notices') s.notices = r.data as AppState['notices'];
     else if (r.id === 'weights') s.weights = r.data as AppState['weights'];
+    else if (r.id === 'nutrition') s.nutrition = r.data as AppState['nutrition'];
     else if (r.id === 'stretch') s.stretch = r.data as AppState['stretch'];
     else if (r.id === 'physio') s.physio = r.data as AppState['physio'];
   }

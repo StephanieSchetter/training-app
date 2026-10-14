@@ -6,6 +6,7 @@ import { mmss } from './engine/running';
 import { easyHrSeries, heldSince, liftChart, liftList, RecoveryKey, recoverySeries, speedSeries, timeTrialSeries, weightSeries } from './stats';
 import { AppState, today } from './store';
 import { reviewToShow } from './coach';
+import { calorieSeries, weightTrendSeries } from './nutrition';
 import { ReviewCard } from './CoachCards';
 import { Icon, Segmented } from './ui';
 
@@ -90,6 +91,16 @@ export function Progress({ state }: { state: AppState }) {
         })}
         <Panel title="Body weight" hint="Weekly average" value={weight[0].points.at(-1) ? `${weight[0].points.at(-1)!.y} kg` : undefined}>
           <LineChart series={weight} stints={state.stints} height={150} format={v => `${v}`} />
+        </Panel>
+      </div>
+
+      <h2>Weight and calories</h2>
+      <div className="chart-grid">
+        <Panel title="Daily weight" hint="Scale readings and the smoothed trend. The trend is what counts." value={weightTrendSeries(state, t)[1].points.at(-1) ? `${weightTrendSeries(state, t)[1].points.at(-1)!.y} kg` : undefined}>
+          <LineChart series={weightTrendSeries(state, t)} stints={state.stints} height={150} from={from} format={v => `${v}`} />
+        </Panel>
+        <Panel title="Calories" hint="Eaten (MyFitnessPal, through Garmin) against Garmin's burn estimate. Days logged under 1,200 kcal are left out.">
+          <LineChart series={calorieSeries(state, t)} stints={state.stints} height={150} from={from} format={v => `${Math.round(v)}`} />
         </Panel>
       </div>
 
