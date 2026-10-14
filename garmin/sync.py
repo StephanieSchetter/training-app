@@ -61,6 +61,21 @@ def day_record(g, d):
         "readiness": ready.get("score") if ready else None,
         "trainingLoad": ready.get("acuteLoad") if ready else None,
     }
+    # Steps, calories burned (Garmin's estimate) and calories eaten as logged in MyFitnessPal, which Garmin
+    # receives when the two accounts are linked (added 14 Oct 2026). Today's figures are partial until the
+    # day ends; each run re-reads the last few days, so they settle.
+    try:
+        summary = g.get_user_summary(d) or {}
+    except Exception:
+        summary = {}
+    num = lambda k: summary.get(k) if isinstance(summary.get(k), (int, float)) else None
+    rec.update({
+        "steps": num("totalSteps"),
+        "kcalOut": num("totalKilocalories"),
+        "kcalActive": num("activeKilocalories"),
+        "kcalBmr": num("bmrKilocalories"),
+        "kcalIn": num("consumedKilocalories"),
+    })
     return rec if any(v is not None for k, v in rec.items() if k != "date") else None
 
 
