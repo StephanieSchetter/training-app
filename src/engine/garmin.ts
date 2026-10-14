@@ -23,6 +23,43 @@ export function matchActivity<T extends Activity>(acts: T[], date: string, type:
 
 export interface Rep { km: number; speed: number }
 
+export interface RepLaps<L> { reps: L[]; /** The lap after each rep but the last. */ recoveries: L[]; /** The final entry in reps is a rep that was cut short. */ stoppedEarly: boolean }
+
+/**
+ * Laps to reps using the shape of the session: rep, recovery, rep, recovery... A lap is rep-length when it
+ * lasted about as long as the rep should; real reps have exactly one other lap between them. That keeps
+ * out a stretch of warm-up that happens to be the same length (14 Oct 2026: it was being read as rep 1),
+ * and it finds the reps even when fewer were finished than planned. A last rep that was cut short is
+ * included and flagged. With no recovery laps to go on, it falls back to the last rep-length laps.
+ */
+export function matchRepLaps<L extends { sec: number }>(laps: L[], reps: Rep[]): RepLaps<L> | null {
+  if (!reps.length) return null;
+  const want = (reps[0].km / reps[0].speed) * 3600;
+  if (!reps.every(r => Math.abs((r.km / r.speed) * 3600 - want) < 1)) return null;
+  const tol = 0.12;
+  const isRep = (l: L | undefined) => !!l && Math.abs(l.sec - want) <= want * tol;
+  let best: number[] = [];
+  for (let i = 0; i < laps.length; i++) {
+    if (!isRep(laps[i])) continue;
+    const chain = [i];
+    for (let j = i; isRep(laps[j + 2]) && !isRep(laps[j + 1]); j += 2) chain.push(j + 2);
+    if (chain.length >= best.length) best = chain;
+  }
+  if (best.length >= 2) {
+    const idx = best.slice(-reps.length);
+    const last = idx.at(-1)!;
+    const cut = laps[last + 2];
+    const stoppedEarly = idx.length < reps.length && !!cut && !isRep(laps[last + 1]) && cut.sec >= 20 && cut.sec < want * (1 - tol);
+    return {
+      reps: [...idx.map(i => laps[i]), ...(stoppedEarly ? [cut] : [])],
+      recoveries: [...idx.slice(0, -1).map(i => laps[i + 1]), ...(stoppedEarly ? [laps[last + 1]] : [])],
+      stoppedEarly,
+    };
+  }
+  const candidates = laps.filter(isRep);
+  return candidates.length >= reps.length ? { reps: candidates.slice(-reps.length), recoveries: [], stoppedEarly: false } : null;
+}
+
 /**
  * Laps to reps, in order. A lap counts as a rep when it lasted about as long as the rep should
  * (treadmill distance on the watch is unreliable; time is not). If there are fewer such laps than

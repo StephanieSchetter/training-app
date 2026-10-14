@@ -46,7 +46,7 @@ const seed = () => window.__dev.update(s => {
     s.garminDays[key] = { date: key, restingHr: 48 + (n % 5), hrv: 40 + (n % 9), sleepHours: 6.5 + (n % 4) * 0.4, sleepScore: 70 + (n % 20), readiness: 55 + (n % 40), trainingLoad: 300 };
   }
   s.garminStatus = { ok: true, lastSync: new Date().toISOString() };
-  s.speeds = { intervals: 15.3, threshold: 12.9, strides: 16 };
+  s.speeds = { intervals: 15.3, threshold: 12.9, strides: 16, resets: ['2026-10-14'] };   // the review reset has already been applied
 });
 
 // ---- Phone ----

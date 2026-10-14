@@ -5,7 +5,7 @@ import { backExtensionGoWeighted, lateralBendStageUp } from './progression';
 import { rampSets } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
 import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
-import { matchActivity, matchLaps } from './garmin';
+import { matchActivity, matchLaps, matchRepLaps } from './garmin';
 import { easyPaceAdvice, hrBetween, isComfortableEasy, isHardEasy, steadyHr } from './coach';
 import { easyCeiling, easyPaceSuggestion } from './running';
 import { adjustSpeed, mmss, readinessSuggestion, repSeconds, restingHrAlert, timeTrialReset } from './running';
@@ -163,6 +163,28 @@ describe('garmin matching', () => {
   it('laps match reps in order, ignoring warm-up, recoveries and cool-down', () => {
     const laps = [lap(520, 120), lap(209, 160), lap(120), lap(210, 164), lap(120), lap(208, 166), lap(120), lap(209, 168), lap(120), lap(211, 170), lap(300, 130)];
     expect(matchLaps(laps, reps)?.map(l => l.avgHr)).toEqual([160, 164, 166, 168, 170]);
+  });
+
+  it('14 Oct intervals: a warm-up lap the length of a rep is left out, and the cut-short fifth rep is flagged', () => {
+    const real = [[387, 120], [211, 145], [211, 156], [129, 143], [214, 158], [136, 148], [209, 161], [123, 156], [209, 165], [128, 159], [93, 156], [349, 126]].map(([sec, avgHr]) => lap(sec, avgHr));
+    const m = matchRepLaps(real, reps)!;
+    expect(m.reps.map(l => l.avgHr)).toEqual([156, 158, 161, 165, 156]);
+    expect(m.stoppedEarly).toBe(true);
+    expect(m.recoveries.map(l => l.avgHr)).toEqual([143, 148, 156, 159]);
+    // the old way took the last five rep-length laps, which pulled in the warm-up
+    expect(matchLaps(real, reps)?.map(l => l.avgHr)).toEqual([145, 156, 158, 161, 165]);
+  });
+
+  it('rep / recovery pattern: a full session, fewer reps than planned, and no recovery laps at all', () => {
+    const full = [lap(520, 120), lap(209, 160), lap(120), lap(210, 164), lap(120), lap(208, 166), lap(120), lap(209, 168), lap(120), lap(211, 170), lap(300, 130)];
+    expect(matchRepLaps(full, reps)).toMatchObject({ stoppedEarly: false });
+    expect(matchRepLaps(full, reps)!.reps.map(l => l.avgHr)).toEqual([160, 164, 166, 168, 170]);
+    // stopped after two reps and went straight to a long cool-down: two reps, nothing flagged as cut short
+    const two = matchRepLaps([lap(520), lap(209, 160), lap(120), lap(210, 164), lap(120), lap(400, 130)], reps)!;
+    expect([two.reps.map(l => l.avgHr), two.stoppedEarly]).toEqual([[160, 164], false]);
+    // lap pressed only at the end of each rep (no separate recovery laps): the last rep-length laps
+    expect(matchRepLaps([lap(600), lap(209, 160), lap(210, 164)], [reps[0], reps[1]])!.reps.map(l => l.avgHr)).toEqual([160, 164]);
+    expect(matchRepLaps([lap(1900)], reps)).toBeNull();
   });
 
   it('too few rep-length laps -> could not match', () => {

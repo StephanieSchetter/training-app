@@ -1,7 +1,7 @@
 // The coach's read (agreed 12 Oct 2026): a debrief for each run and a review of each week, written from
 // what was logged and what the watch recorded. Everything here is a fixed rule applied to Brad's own numbers.
 import { DRIFT_MAX_PCT, EASY_LATE_HR, EasyRun, isComfortableEasy, isHardEasy, Steady, steadyHr } from './engine/coach';
-import { matchActivity, matchLaps } from './engine/garmin';
+import { matchActivity, matchRepLaps } from './engine/garmin';
 import { EASY_HR_HIGH } from './engine/running';
 import { addDays } from './engine/schedule';
 import { mobilityTargetText, mobilityThisWeek } from './Stretch';
@@ -113,11 +113,17 @@ export function runDebrief(state: AppState, r: RunLog): Debrief | null {
   const work = r.segs.filter(s => s.work && s.prescribed !== undefined);
   const done = work.filter(s => s.done);
   const speed = done[0] ? done[0].actual ?? done[0].prescribed! : undefined;
-  const repHr = (run: RunLog, a: GarminActivity) => {
+  const repLaps = (run: RunLog, a: GarminActivity) => {
     const reps = run.segs.filter(s => s.work && s.done && s.km && s.prescribed).map(s => ({ km: s.km!, speed: s.actual ?? s.prescribed! }));
-    return matchLaps(a.laps, reps)?.map(l => l.avgHr).filter((x): x is number => x != null) ?? null;
+    return matchRepLaps(a.laps, reps);
   };
+  const nums = (laps: { avgHr: number | null }[]) => laps.map(l => l.avgHr).filter((x): x is number => x != null);
+  const repHr = (run: RunLog, a: GarminActivity) => { const m = repLaps(run, a); return m ? nums(m.stoppedEarly ? m.reps.slice(0, -1) : m.reps) : null; };
+  const matched = repLaps(r, act);
   const hrs = repHr(r, act);
+  const stopped = !!matched?.stoppedEarly;
+  const full = hrs?.length ?? 0;
+  if (matched && full < done.length) notes.push({ tone: 'watch', text: `The watch shows ${full} full rep${full === 1 ? '' : 's'}${stopped ? ' and one cut short' : ''}, against ${done.length} ticked. Next time leave an unfinished rep unticked and choose "Couldn't finish all reps", so the speed rule knows.` });
   notes.push({ tone: done.length < work.length ? 'watch' : 'info', text: `${done.length} of ${work.length} reps done${speed !== undefined ? ` at ${speed} km/h` : ''}.${r.speedAfter !== undefined && r.speedBefore !== undefined ? ` Speed for next time: ${r.speedAfter} km/h${r.speedAfter === r.speedBefore ? ' (unchanged)' : ''}.` : ''}` });
   if (hrs && hrs.length >= 2) {
     const rise = Math.round(hrs.at(-1)! - hrs[0]);
@@ -125,6 +131,11 @@ export function runDebrief(state: AppState, r: RunLog): Debrief | null {
     notes.push(r.type === 'threshold'
       ? { tone: rise > 8 ? 'watch' : 'good', text: `Heart rate by rep: ${list}. ${rise > 8 ? `It climbed ${rise} beats from the first rep to the last. Threshold work should settle, so this speed is still a stretch.` : 'Steady across the reps, which is what threshold work should look like.'}` }
       : { tone: 'info', text: `Heart rate by rep: ${list}${act.maxHr != null ? `, peaking at ${Math.round(act.maxHr)}` : ''}. A climb across interval reps is expected.` });
+    const rec = matched ? nums(matched.recoveries) : [];
+    if (r.type === 'intervals' && rec.length >= 2) {
+      const stuck = rec.at(-1)! >= hrs[0] - 5;
+      notes.push({ tone: stuck ? 'watch' : 'info', text: `Between reps your heart rate averaged ${rec.map(h => Math.round(h)).join(', ')}. ${stuck ? 'By the end it was barely coming down, so each rep started from a higher point. That means the speed is too high or the recoveries too short for now.' : 'It was coming down between reps, which is what the recoveries are for.'}` });
+    }
   } else if (done.length) {
     notes.push({ tone: 'info', text: 'The watch laps couldn\'t be matched to the reps, so there is no heart rate per rep. Press lap at the start and end of each rep.' });
   }
@@ -139,9 +150,9 @@ export function runDebrief(state: AppState, r: RunLog): Debrief | null {
   if (morning) notes.push(morning.note);
   const cond = conditionsNote(r, r.answer === 'dnf');
   if (cond) notes.push(cond);
-  const [verdict, tone, next]: [string, Note['tone'], string] = r.answer === 'yes' ? ['Strong, with room to spare', 'good', 'Next time: 0.3 km/h quicker.']
-    : r.answer === 'no' ? ['On the limit, as intended', 'good', 'Next time: the same speed. Aim to finish the last rep with one more in you.']
-    : r.answer === 'dnf' ? [morning?.low ? 'Too much today, and you came in under-recovered' : 'Too much today', 'watch', 'Next time: the same speed. If it happens again the app takes 0.3 km/h off.']
+  const [verdict, tone, next]: [string, Note['tone'], string] = r.answer === 'yes' && !stopped ? ['Strong, with room to spare', 'good', 'Next time: 0.3 km/h quicker.']
+    : r.answer === 'no' && !stopped ? ['On the limit, as intended', 'good', 'Next time: the same speed. Aim to finish the last rep with one more in you.']
+    : r.answer === 'dnf' || stopped ? [morning?.low ? 'Too much today, and you came in under-recovered' : 'Too much today', 'watch', 'Next time: the same speed. If it happens again the app takes 0.3 km/h off.']
     : ['Logged', 'info', ''];
   return { verdict, tone, notes, next: next || undefined };
 }

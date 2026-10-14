@@ -227,7 +227,7 @@ function TimeTrial({ state, run, closeBtn }: { state: AppState; run: RunLog; clo
           r.speedAfter = res.intervals;
           // Easy pace doesn't jump on a time trial: the trial only sets its ceiling (agreed rule, 8 Oct 2026).
           const kept = s.speeds?.easy !== undefined ? Math.min(s.speeds.easy, res.easy) : undefined;
-          s.speeds = { intervals: res.intervals, threshold: res.threshold, strides: res.strides, easyCeiling: res.easy, easy: kept };
+          s.speeds = { intervals: res.intervals, threshold: res.threshold, strides: res.strides, easyCeiling: res.easy, easy: kept, resets: s.speeds?.resets };
           const slot = s.schedule.find(z => z.idx === r.slotIdx);
           if (slot) slot.done = true;
           s.activeRunId = null;

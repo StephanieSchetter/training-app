@@ -27,7 +27,7 @@ const addRuns = (speed, hrs, startDay) => page.evaluate((speed, hrs, startDay) =
 await page.goto(URL, { waitUntil: 'networkidle0' }); await wait(200);
 await addRuns(10.2, [140, 142, 144], 0); await wait(400);
 check('No easy-pace suggestion before any time trial', !/easy pace/i.test(await text()));
-await page.evaluate(() => window.__dev.update(s => { s.speeds = { intervals: 14.8, threshold: 13.5, strides: 16.5, easyCeiling: 11.0 }; })); await wait(400);
+await page.evaluate(() => window.__dev.update(s => { s.speeds = { intervals: 14.8, threshold: 13.5, strides: 16.5, easyCeiling: 11.0, resets: ['2026-10-14'] }; })); await wait(400);
 let t = await text();
 check('After a time trial, three easy runs at 145 or under suggest +0.2', t.includes('Try your next easy run at 10.4 km/h') && t.includes('averaged 140, 142, 144 bpm'), t.split(/SUGGESTION · EASY PACE/i)[1]);
 check('It states the ceiling', t.includes('11.0 km/h'));

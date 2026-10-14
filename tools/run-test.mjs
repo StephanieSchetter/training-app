@@ -52,15 +52,16 @@ const afterPractice = await text();
 check('Practice intervals can be run before the block', afterPractice.includes('Delete practice data'));
 check('Practice "Yes" does not change speeds', afterPractice.includes('at 13.8 km/h') && !afterPractice.includes('14.1'));
 
+// The program's review reset (14 Oct 2026) puts intervals at 13.2 once the block has started.
 // Week 1: yes -> +0.3
 await doIntervals('2026-10-14', 'Yes');
 await on('2026-10-15');
-check('10a: "Yes" puts next week\'s intervals up 0.3', (await summaryOf('× 1 km at')).includes('14.1 km/h'), await summaryOf('× 1 km at'));
+check('10a: "Yes" puts next week\'s intervals up 0.3', (await summaryOf('× 800 m at')).includes('13.5 km/h'), await summaryOf('× 800 m at'));
 
 // Week 2: couldn't finish -> same speed
 await doIntervals('2026-10-21', "Couldn't finish", { skipLast: true });
 await on('2026-10-22');
-check('10b: one "couldn\'t finish" keeps the speed', (await summaryOf('× 1.2 km at')).includes('14.1 km/h'), await summaryOf('× 1.2 km at'));
+check('10b: one "couldn\'t finish" keeps the speed', (await summaryOf('× 1 km at')).includes('13.5 km/h'), await summaryOf('× 1 km at'));
 check('10b: no alert after one', !(await text()).includes('slipped two sessions'));
 
 // Week 3: couldn't finish again -> -0.3 and the Gym B alert
@@ -81,12 +82,12 @@ for (let i = 0; i < 30; i++) await click('Less Seconds');
 const tt = await text();
 await shot('time-trial');
 check('11: time trial 21:00 averages 14.29 km/h', tt.includes('14.29 km/h'));
-check('11: intervals was 13.8 (after the -0.3), now 14.8', /Intervals\s*14\.8\s*was 13\.8/.test(tt), tt.split('NEW SPEEDS')[1]?.replace(/\n/g, ' ').slice(0, 120));
+check('11: intervals was 13.2 (after the -0.3), now 14.8', /Intervals\s*14\.8\s*was 13\.2/.test(tt), tt.split('NEW SPEEDS')[1]?.replace(/\n/g, ' ').slice(0, 120));
 check('11: threshold 13.5', /Threshold\s*13\.5/.test(tt));
-check('11: strides up by the same 1.0 -> 16.5', /Strides\s*16\.5/.test(tt));
+check('11: strides up by the same 1.6 -> 17.1', /Strides\s*17\.1/.test(tt));
 await click('Confirm new speeds');
 await on('2026-11-05');
-check('11: next intervals use 14.8', (await text()).includes('at 14.8 km/h'));
+check('11: next intervals use 14.8, and the review reset is not applied a second time', (await text()).includes('at 14.8 km/h'));
 
 await browser.close();
 console.log(results.every(Boolean) ? '\nAll run checks passed' : '\nSome run checks FAILED');

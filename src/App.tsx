@@ -49,7 +49,8 @@ export function App() {
   const ready = sync.auth === 'in' && !!state.program;
 
   // Once a day, and again when new Garmin data arrives: move missed sessions and check the resting-HR rule.
-  useEffect(() => { if (ready) dailyChecks(); }, [ready, t, garminDays]);
+  const resets = state.program?.running?.resets?.length ?? 0;
+  useEffect(() => { if (ready) dailyChecks(); }, [ready, t, garminDays, resets]);
 
   if (sync.auth === 'loading') return <div className="screen" />;
   if (sync.auth === 'out') return <Login />;

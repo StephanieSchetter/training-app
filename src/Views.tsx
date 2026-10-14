@@ -1,7 +1,7 @@
 // Calendar, the read-only view of any past or upcoming session, and Settings.
 import { useRef, useState } from 'react';
 import { addDays, isGym, Slot } from './engine/schedule';
-import { matchActivity, matchLaps, Rep } from './engine/garmin';
+import { matchActivity, matchRepLaps, Rep } from './engine/garmin';
 import { runDebrief } from './coach';
 import { DebriefCard } from './CoachCards';
 import { schemeText } from './Gym';
@@ -33,7 +33,8 @@ const hms = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 
 /** The watch activity that goes with a logged session, and for interval/threshold runs the heart rate per rep. */
 function GarminCard({ state, date, type, startedAt, reps, prefer }: { state: AppState; date: string; type: 'run' | 'strength'; startedAt: number; reps?: Rep[]; prefer?: 'longest' }) {
   const act = matchActivity(state.garminActs, date, type, startedAt, prefer);
-  const laps = act && reps?.length ? matchLaps(act.laps, reps) : null;
+  const found = act && reps?.length ? matchRepLaps(act.laps, reps) : null;
+  const laps = found?.reps ?? null;
   return (
     <>
       <h2>Garmin</h2>
@@ -48,8 +49,9 @@ function GarminCard({ state, date, type, startedAt, reps, prefer }: { state: App
             ? (
               <div className="card list">
                 {laps.map((l, i) => (
-                  <div className="line" key={i}><span>Rep {i + 1}</span><span className="tab">{l.avgHr != null ? `${Math.round(l.avgHr)} bpm` : '—'} <span className="muted small">· {hms(l.sec)}</span></span></div>
+                  <div className="line" key={i}><span>Rep {i + 1}{found!.stoppedEarly && i === laps.length - 1 ? ' (stopped early)' : ''}</span><span className="tab">{l.avgHr != null ? `${Math.round(l.avgHr)} bpm` : '—'} <span className="muted small">· {hms(l.sec)}</span></span></div>
                 ))}
+                {laps.length < reps.length && <div className="line muted small">The watch laps show {found!.stoppedEarly ? laps.length - 1 : laps.length} full rep{laps.length - (found!.stoppedEarly ? 1 : 0) === 1 ? '' : 's'} of the {reps.length} ticked.</div>}
               </div>
             )
             : <div className="card muted">Couldn't match laps to reps, so only the session average is shown. Pressing lap at the start and end of each rep makes this work.</div>)}

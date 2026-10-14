@@ -102,10 +102,10 @@ async function fresh(date, { catchUp = false, setup } = {}) {
   await a.click('Open Intervals');
   await a.click('Accept');
   const t = await a.text();
-  check('12: accepted -> intervals stay, at 13.5 km/h', t.includes('5 × 800 m at 13.5 km/h') && !t.includes('Easy Run'), t.split('\n').find(l => l.includes('× 800')));
+  check('12: accepted -> intervals stay, 0.3 slower at 12.9 km/h', t.includes('5 × 800 m at 12.9 km/h') && !t.includes('Easy Run'), t.split('\n').find(l => l.includes('× 800')));
   await a.shot('readiness-intervals');
   await a.click('Start this run');
-  check('12: the run starts as intervals at the lower speed', (await a.text()).includes('Rep 1 of 5: 800 m at 13.5 km/h'));
+  check('12: the run starts as intervals at the lower speed', (await a.text()).includes('Rep 1 of 5: 800 m at 12.9 km/h'));
   await a.close();
 }
 

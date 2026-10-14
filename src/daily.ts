@@ -1,7 +1,7 @@
 // Things the app works out by itself each day: missed sessions (spec 4.2) and the resting-HR pull-back alert (8.2).
 import { restingHrAlert } from './engine/running';
 import { addDays, shiftFrom } from './engine/schedule';
-import { getState, today, update } from './store';
+import { currentSpeeds, getState, today, update } from './store';
 
 const NAMES: Record<string, string> = { easy: 'Easy Run', intervals: 'Intervals', threshold: 'Threshold Run', gymA: 'Gym A', gymB: 'Gym B', gymC: 'Gym C', gymD: 'Gym D' };
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
@@ -11,6 +11,16 @@ export function dailyChecks() {
   const t = today();
   const s0 = getState();
   if (!s0.program || t < s0.program.start) return;
+
+  // Speeds reset at a review arrive in the program file and are applied once.
+  const pending = (s0.program.running?.resets ?? []).filter(r => !(s0.speeds?.resets ?? []).includes(r.from));
+  if (pending.length) {
+    update(s => {
+      let sp = currentSpeeds(s);
+      for (const r of pending) sp = { ...sp, intervals: r.intervals ?? sp.intervals, threshold: r.threshold ?? sp.threshold, resets: [...(sp.resets ?? []), r.from] };
+      s.speeds = sp;
+    });
+  }
 
   // A missed day pushes every remaining session later, so the missed one lands on today.
   // Development only: ?nocatchup lets a scripted test jump to a later date without the schedule following it.

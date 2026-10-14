@@ -67,6 +67,8 @@ export interface RunningPlan {
   /** Warn when a run's total distance goes over this (default 8). */
   maxKm?: number;
   speeds: { intervals: number; threshold: number; recovery: number; thresholdRecovery: number; strides: number; strideRecovery: number; cooldown: number };
+  /** Speeds reset at a review. Each is applied once, when the app first sees it; the weekly rules carry on from there. */
+  resets?: { from: string; intervals?: number; threshold?: number }[];
   weeks: Record<string, RunWeek>;
 }
 export interface Stint { location: string; start: string; end: string; gym: string }
@@ -117,6 +119,8 @@ export interface Speeds {
   easyCeiling?: number;
   /** Easy speed once Brad has accepted a heart-rate-based change; until then the plan's speed is used. */
   easy?: number;
+  /** Review resets already applied (their dates), so each happens once. */
+  resets?: string[];
 }
 export interface Alert { id: string; kind: 'intervals-slipping' | 'rhr-high' | 'easy-pace'; date: string; status: 'open' | 'accepted' | 'ignored' }
 
