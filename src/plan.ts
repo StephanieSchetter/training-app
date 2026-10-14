@@ -371,7 +371,9 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
 
     const isMain = item.scheme.t === 'rpt';
     const top = targets[0]?.weight ?? null;
-    const ramp = isMain && usesWeight && top !== null ? rampSets(top, mainLiftsSoFar === 0, ctx()) : [];
+    // Every weighted lift gets ramp-up sets; not warm-up items, kettlebells or weight hung on a bodyweight move.
+    const rampable = usesWeight && top !== null && !item.warmup && equip !== 'kettlebell' && equip !== 'added';
+    const ramp = !rampable ? [] : rampSets(top, isMain ? (mainLiftsSoFar === 0 ? 'first' : 'main') : 'other', ctx());
     if (isMain && usesWeight) mainLiftsSoFar++;
     return {
       plannedEx: item.ex, ex, info, title, scheme, pair: item.pair, before: item.before,

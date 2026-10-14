@@ -14,7 +14,8 @@ page.on('pageerror', e => console.log('PAGE ERROR', e.message));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const results = [];
 const check = (name, pass, detail) => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + String(detail).replace(/\s+/g, ' ').slice(0, 220) : ''}`); };
-const text = () => page.evaluate(() => document.body.innerText);
+// Previews list ramp-up sets under each lift (14 Oct 2026); these checks read the working weights, so drop those lines.
+const text = () => page.evaluate(() => document.body.innerText.replace(/\nRamp-up: [^\n]*/g, ''));
 const shot = async name => { if (out) { await wait(300); await page.screenshot({ path: join(out, `stack-${name}.png`) }); } };
 const click = async (label, nth = 0) => {
   const ok = await page.evaluate((label, nth) => {
@@ -66,6 +67,27 @@ await page.evaluate(() => window.__dev.update(s => { s.stints.push({ location: '
 await on('2026-11-24');
 await click('Gym B');
 check('Back at Port Hedland in November: 65 kg done well moves to 67.5, the agreed weight no longer applies', (await line('Leg Extension')).includes('67.5 kg'), await line('Leg Extension'));
+
+// 14 Oct: a clear way to stop mid-rep, and a three-way morning check
+await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; s.activeRunId = null; }));
+await on('2026-10-21');
+await click('Open Intervals'); await click('Start this run');
+await click('Done'); await click('Done');   // warm-up
+t = await text();
+check('During a rep there is an obvious way to stop', t.includes("Can't finish this rep? End the run here"));
+await click("Can't finish this rep?");
+t = await text();
+check('Stopping early asks only the right question', t.includes('Ending the run early') && t.includes("Couldn't finish all reps") && !t.includes('Yes, could have'), t.slice(-400));
+await click("Couldn't finish all reps");
+check('It is recorded as not finished', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'dnf' && !!r.finishedAt && r.segs.filter(x => x.work && x.done).length === 0; }));
+await page.evaluate(() => window.__dev.update(s => { const at = Date.now() - 3600000; s.sessions.push({ id: 'gymc-check', slotIdx: null, type: 'gymC', date: '2026-10-22', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 }); }));
+await on('2026-10-23');
+t = await text();
+check('The morning check offers Normal, Stiff and Worse, and explains them', /MORNING CHECK-IN/i.test(t) && t.includes('Normal') && t.includes('Stiff') && t.includes('the usual tightness after training'), t.split(/MORNING CHECK-IN/i)[1]?.slice(0, 300));
+await click('Stiff', 1);
+await click('Save check-in');
+t = await text();
+check('"Stiff" is saved and changes nothing: no hold, no offers', (await page.evaluate(() => window.__dev.getState().checkins.at(-1).back)) === 'stiff' && !/SUGGESTION · /i.test(t));
 
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} review checks passed` : `\n${results.filter(x => !x).length} of ${results.length} review checks FAILED`);

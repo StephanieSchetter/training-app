@@ -572,7 +572,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const canRamp = !done && round === 0 && side !== 'R' && item.usesWeight && !sets.some(s => s.exId === item.ex && !s.rampUp && !s.extra);
   // Main lifts open with their ramp-up sets: ticked off in order, logged as ramp-ups, never counted.
   const rampDone = sets.filter(s => s.exId === item.ex && s.rampUp).length;
-  const showRamp = canRamp && item.isMain;
+  const showRamp = canRamp && (item.isMain || item.ramp.length > 0);
   const logRamp = (t: { weight: number | null; reps: number }) => {
     navigator.vibrate?.(25);
     const id = uid();
@@ -597,7 +597,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
                   </button>
                 ))}
               </div>
-              <div className="muted small">Easy and crisp, about a minute between them. Then rest 2–3 minutes before the first working set below.</div>
+              <div className="muted small">{item.ramp.length > 1 ? 'Easy and crisp, about a minute between them. Then rest 2–3 minutes before the first working set below.' : 'Light and easy, just to groove the movement. Then straight into the first working set below.'}</div>
             </>
           ) : (
             <div className="muted">Build up over 2–3 lighter sets: about half, then three-quarters of what you expect to lift, for a few easy reps each. Log each one with "Log as ramp-up set" below, then do your first counted set.</div>

@@ -59,13 +59,14 @@ export function rptSets(top: number, scheme: number[], topReps: number, ctx: Lif
 const BAR_KG = 20;
 
 /**
- * Ramp-up sets before a main lift's first working set (agreed 12 Oct 2026). The first main lift of a
- * session gets three (about 50% x 5, 70% x 3, 85% x 1); later ones are already warm and get two
- * (60% x 5, 80% x 2). Each is rounded to a weight that exists; a barbell never goes below the empty bar;
+ * Ramp-up sets before a lift's first working set (agreed 12 Oct 2026). The first main lift of a
+ * session gets three (about 50% x 5, 70% x 3, 85% x 1); later main lifts are already warm and get two
+ * (60% x 5, 80% x 2); other weighted lifts get one lighter set to groove the movement (60% x 6,
+ * added 14 Oct 2026). Each is rounded to a weight that exists; a barbell never goes below the empty bar;
  * anything that rounds to the working weight, or repeats the set before it, is dropped.
  */
-export function rampSets(top: number, firstMainLift: boolean, ctx: LiftCtx): SetTarget[] {
-  const plan = firstMainLift ? [[0.5, 5], [0.7, 3], [0.85, 1]] : [[0.6, 5], [0.8, 2]];
+export function rampSets(top: number, kind: 'first' | 'main' | 'other', ctx: LiftCtx): SetTarget[] {
+  const plan = kind === 'first' ? [[0.5, 5], [0.7, 3], [0.85, 1]] : kind === 'main' ? [[0.6, 5], [0.8, 2]] : [[0.6, 6]];
   const floor = ctx.equip === 'barbell' || ctx.equip === 'barbell_heavy' ? BAR_KG : 0;
   const out: SetTarget[] = [];
   for (const [share, reps] of plan) {

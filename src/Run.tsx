@@ -124,6 +124,7 @@ export function RunSession({ runId }: { runId: string }) {
                 onPlus={() => patch(run.id, r => { r.segs[cur].actual = Math.round(((r.segs[cur].actual ?? seg.prescribed!) + 0.1) * 10) / 10; })} />
             )}
             {plan.asks && <p className="lead small">Press lap on your watch for each rep.</p>}
+            {plan.asks && seg.work && <button className="btn ghost" onClick={end}>Can't finish this rep? End the run here</button>}
           </>
         ) : (
           <div className="card done-card"><span className="ok big-ok"><Icon name="check" size={30} /></span><div><b>Every part done. Nice work.</b><div className="muted small">Tap a line below if you need to untick it.</div></div></div>
@@ -164,7 +165,7 @@ export function RunSession({ runId }: { runId: string }) {
         </Sheet>
       )}
       {asking && plan.asks && (
-        <Sheet title="Could you have done 2 more reps at this speed?" onClose={() => setAsking(false)}>
+        <Sheet title={workDone < workTotal ? 'Ending the run early' : 'Could you have done 2 more reps at this speed?'} onClose={() => setAsking(false)}>
           <p className="muted">
             {workDone < workTotal
               ? `You ticked ${workDone} of ${workTotal} reps.`

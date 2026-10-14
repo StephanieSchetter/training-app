@@ -45,7 +45,7 @@ async function fresh(date, spec, extra) {
   };
   const day = async num => { await page.evaluate(num => [...document.querySelectorAll('.cal-day:not(.out)')].find(b => b.querySelector('.cal-num').textContent === String(num)).click(), num); await wait(150); };
   // Opens the preview of the session on a given day of the visible month and returns its "plan" text.
-  const plan = async (num, name) => { await click('Calendar'); await day(num); await click(name); const t = await text(); await click('Back'); await click('Today'); return t.split('THE PLAN')[1] ?? t; };
+  const plan = async (num, name) => { await click('Calendar'); await day(num); await click(name); const t = await text(); await click('Back'); await click('Today'); return (t.split('THE PLAN')[1] ?? t).replace(/\nRamp-up: [^\n]*/g, ''); };
   const shot = name => wait(250).then(() => page.screenshot({ path: join(out, `physio-${name}.png`) }));
   return { page, text, click, day, plan, shot, close: () => ctx.close() };
 }
@@ -201,7 +201,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const sets = [...dl(60), ['db_bench', 1, 30, 8], ['db_bench', 2, 26, 10], ['db_bench', 3, 24, 12]];
   const ok = await fresh('2026-10-16', [{ id: 'c1', type: 'gymC', date: '2026-10-15', week: 1, daysAgo: 1, sets }]);
   const card = await ok.text();
-  check('Morning check-in offers OK / Worse for knee and back', /MORNING CHECK-IN · AFTER GYM C/i.test(card) && /Knee\s*OK\s*Worse\s*Back\s*OK\s*Worse/i.test(card) && !/Better|Same/.test(card.split(/MORNING CHECK-IN/i)[1].slice(0, 200)));
+  check('Morning check-in offers Normal / Stiff / Worse for knee and back', /MORNING CHECK-IN · AFTER GYM C/i.test(card) && /Knee\s*Normal\s*Stiff\s*Worse\s*Back\s*Normal\s*Stiff\s*Worse/i.test(card) && !/Better|Same/.test(card.split(/MORNING CHECK-IN/i)[1].slice(0, 200)));
   await ok.shot('checkin');
   await ok.click('Save check-in');
   check('Check OK: bench hit the top of its range, so next week goes up a step (30 -> 32 kg at FIFO)', /Flat Dumbbell Bench Press\s*3 sets · 6 \/ 8 \/ 10\s*32 kg/.test(await ok.plan(22, 'Gym C')));

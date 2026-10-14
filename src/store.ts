@@ -124,8 +124,12 @@ export interface Speeds {
 }
 export interface Alert { id: string; kind: 'intervals-slipping' | 'rhr-high' | 'easy-pace'; date: string; status: 'open' | 'accepted' | 'ignored' }
 
-/** Morning check answer. 'better' and 'same' are from the first version of the check-in and both mean OK. */
-export type Feel = 'ok' | 'worse' | 'better' | 'same';
+/**
+ * Morning check answer. 'stiff' (added 14 Oct 2026) is the usual next-day tightness from training that eases
+ * with movement: recorded, but treated like OK by every rule. Only 'worse' changes anything.
+ * 'better' and 'same' are from the first version of the check-in and both mean OK.
+ */
+export type Feel = 'ok' | 'stiff' | 'worse' | 'better' | 'same';
 type Offer = 'pending' | 'yes' | 'no';
 /** Morning-after check-in for one gym session, plus what was offered and whether Brad took it. */
 export interface Checkin {

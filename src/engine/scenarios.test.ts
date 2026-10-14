@@ -243,24 +243,29 @@ describe('running', () => {
 });
 
 describe('ramp-up sets before a main lift', () => {
-  const sets = (top: number, first: boolean, ctx: LiftCtx) => rampSets(top, first, ctx).map(s => `${s.weight}x${s.reps}`).join(' ');
+  const sets = (top: number, kind: 'first' | 'main' | 'other', ctx: LiftCtx) => rampSets(top, kind, ctx).map(s => `${s.weight}x${s.reps}`).join(' ');
   const deadlift: LiftCtx = { exId: 'deadlift', equip: 'barbell_heavy', gym: adelaide, week: 1 };
   const press: LiftCtx = { exId: 'db_shoulder_press', equip: 'dumbbell', gym: adelaide, week: 3 };
 
   it('first main lift of the session: three sets building to the working weight', () => {
-    expect(sets(70, true, deadlift)).toBe('35x5 50x3 60x1');
-    expect(sets(100, true, incline)).toBe('50x5 70x3 85x1');
+    expect(sets(70, 'first', deadlift)).toBe('35x5 50x3 60x1');
+    expect(sets(100, 'first', incline)).toBe('50x5 70x3 85x1');
   });
 
   it('later main lifts are already warm: two sets', () => {
-    expect(sets(80, false, incline)).toBe('47.5x5 65x2');
-    expect(sets(25, false, press)).toBe('15x5 20x2');
+    expect(sets(80, 'main', incline)).toBe('47.5x5 65x2');
+    expect(sets(25, 'main', press)).toBe('15x5 20x2');
+  });
+
+  it('other weighted lifts get one lighter set', () => {
+    expect(sets(12, 'other', press)).toBe('7.5x6');
+    expect(sets(65, 'other', { exId: 'leg_extension', equip: 'machine', gym: { ...adelaide, machineSteps: { leg_extension: 2.5 } }, week: 2 })).toBe('40x6');
   });
 
   it('a barbell never goes below the empty bar, and repeats or the working weight itself are dropped', () => {
-    expect(sets(30, true, incline)).toBe('20x5 25x1');
-    expect(sets(20, true, incline)).toBe('');
-    expect(sets(7.5, true, press)).toBe('2.5x5 5x3');
+    expect(sets(30, 'first', incline)).toBe('20x5 25x1');
+    expect(sets(20, 'first', incline)).toBe('');
+    expect(sets(7.5, 'first', press)).toBe('2.5x5 5x3');
   });
 });
 

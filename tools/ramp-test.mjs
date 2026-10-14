@@ -50,7 +50,7 @@ await click('Next exercise');
 t = await text();
 check('A main lift with no weight yet (week 1) explains how to build up instead', /RAMP-UP FIRST/i.test(t) && t.includes('Build up over 2–3 lighter sets') && /Flat Dumbbell Bench Press/i.test(t), t.slice(0, 260));
 await click('Next exercise');
-check('Lifts that are not main lifts have no ramp-up card', !/RAMP-UP FIRST/i.test(await text()), (await text()).slice(0, 120));
+check('A bodyweight lift (pull-ups) has no ramp-up card', !/RAMP-UP FIRST/i.test(await text()), (await text()).slice(0, 120));
 
 // Week 3 in Adelaide: a second main lift of the session gets two sets
 await page.evaluate(() => window.__dev.update(s => {
@@ -66,6 +66,22 @@ await click('Next exercise'); await click('Next exercise');
 t = await text();
 check('Second main lift of the day (bench at 32.5 kg) gets two ramp-up sets', /Flat Dumbbell Bench Press/i.test(t) && t.includes('20 kg × 5') && t.includes('25 kg × 2') && !t.includes('× 1\n'), t.split(/RAMP-UP FIRST/i)[1]);
 await shot('bench');
+
+// 14 Oct: every weighted lift gets a lighter set first, and the preview lists them
+await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; }));
+await page.goto('http://localhost:5173/?local&nocatchup&today=2026-11-05', { waitUntil: 'networkidle0' }); await wait(250);
+await click('Gym C');   // next Thursday's preview (this test already started the 29 Oct one)
+t = await text();
+check('The session preview lists ramp-up weights', /Conventional Deadlift[\s\S]{0,40}Ramp-up: \d+ × 5, \d+ × 3/.test(t) && /Flat Dumbbell Bench Press[\s\S]{0,40}Ramp-up: [\d.]+ × 5, [\d.]+ × 2/.test(t), t.split('THE PLAN')[1]?.slice(0, 400));
+await page.evaluate(() => window.__dev.update(s => {
+  const at = Date.now() - 3 * 86400000;
+  s.sessions.push({ id: 'w2b', slotIdx: null, type: 'gymB', date: '2026-10-20', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
+  s.sets.push({ id: 'c1', sessionId: 'w2b', exId: 'incline_curl', plannedExId: 'incline_curl', setNo: 1, weight: 12.5, reps: 10, rir: 2, suggestedWeight: null, suggestedReps: 8, ts: at });
+}));
+await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-27', { waitUntil: 'networkidle0' }); await wait(250);
+await click('Gym B');
+t = await text();
+check('A non-main lift (incline curl) shows one lighter set in the preview', /Incline Dumbbell Curl[\s\S]{0,40}Ramp-up: 7\.5 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
 
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} ramp-up checks passed` : `\n${results.filter(x => !x).length} of ${results.length} ramp-up checks FAILED`);

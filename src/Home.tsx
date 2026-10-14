@@ -17,7 +17,7 @@ import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from '.
 
 const PRACTICE_FOR_TESTS = import.meta.env.DEV && new URLSearchParams(location.search).has('practice');
 const SHORT: Record<string, string> = { easy: 'Easy', intervals: 'Int', threshold: 'Thr', gymA: 'A', gymB: 'B', gymC: 'C', gymD: 'D' };
-const FEELS: { value: Feel; label: string }[] = [{ value: 'ok', label: 'OK' }, { value: 'worse', label: 'Worse' }];
+const FEELS: { value: Feel; label: string }[] = [{ value: 'ok', label: 'Normal' }, { value: 'stiff', label: 'Stiff' }, { value: 'worse', label: 'Worse' }];
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
 /** One-line description of a planned session, e.g. "5 × 800 m at 13.8 km/h, 2 min recovery". */
@@ -52,7 +52,7 @@ function CheckinCard({ state, t }: { state: AppState; t: string }) {
     <div className="card">
       <div className="overline">Morning check-in · after {NAMES[last.type]}{daysBetween(last.date, t) > 1 ? ` on ${niceDate(last.date)}` : ''}</div>
       <b>How were your knee and back the morning after?</b>
-      <div className="muted small">"Worse" holds that session's main lifts at the same weight next week.</div>
+      <div className="muted small"><b>Normal</b>: as it usually is. <b>Stiff</b>: the usual tightness after training that eases once you move. <b>Worse</b>: more pain than usual, or stiffness that isn't easing. Only Worse changes anything: it holds that session's main lifts at the same weight next week.</div>
       <div className="field"><div className="field-label">Knee</div><Segmented options={FEELS} value={knee} onChange={v => v && setKnee(v)} /></div>
       <div className="field"><div className="field-label">Back</div><Segmented options={FEELS} value={back} onChange={v => v && setBack(v)} /></div>
       <button className="btn primary fit-h" onClick={save}>Save check-in</button>
