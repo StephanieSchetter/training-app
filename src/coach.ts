@@ -5,7 +5,7 @@ import { matchActivity, matchRepLaps } from './engine/garmin';
 import { EASY_HR_HIGH } from './engine/running';
 import { addDays } from './engine/schedule';
 import { mobilityTargetText, mobilityThisWeek } from './Stretch';
-import { AppState, GarminActivity, RunLog } from './store';
+import { AppState, currentSpeeds, GarminActivity, RunLog } from './store';
 
 export interface Note { tone: 'good' | 'watch' | 'info'; text: string }
 export interface Debrief { verdict: string; tone: Note['tone']; notes: Note[]; next?: string }
@@ -154,6 +154,12 @@ export function runDebrief(state: AppState, r: RunLog): Debrief | null {
     : r.answer === 'no' && !stopped ? ['On the limit, as intended', 'good', 'Next time: the same speed. Aim to finish the last rep with one more in you.']
     : r.answer === 'dnf' || stopped ? [morning?.low ? 'Too much today, and you came in under-recovered' : 'Too much today', 'watch', 'Next time: the same speed. If it happens again the app takes 0.3 km/h off.']
     : ['Logged', 'info', ''];
+  // A speed reset after this run (from a review) overrides what the weekly rule said at the time.
+  const latest = !state.runs.some(x => x.type === r.type && !x.practice && x.finishedAt && !x.timeTrial && x.startedAt > r.startedAt);
+  const now = currentSpeeds(state)[r.type as 'intervals' | 'threshold'];
+  if (latest && r.speedAfter !== undefined && now !== r.speedAfter) {
+    return { verdict, tone, notes, next: `Next time: ${now} km/h. The speed was reset after this session.` };
+  }
   return { verdict, tone, notes, next: next || undefined };
 }
 
