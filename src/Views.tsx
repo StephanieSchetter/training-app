@@ -205,7 +205,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
                     ? (done.length
                       ? done.map(s => <div className="muted small tab" key={s.id}>Set {s.setNo}{s.side ? ` ${s.side}` : ''}: {s.weight != null ? `${s.weight} kg × ` : ''}{s.reps}{s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}</div>)
                       : <div className="muted small">Not done</div>)
-                    : <>{p.ramp.length > 0 && <div className="muted small">Ramp-up: {p.ramp.map(r => `${r.weight} × ${r.reps}`).join(', ')}</div>}<div className="muted small">{schemeText(p)}{p.rir !== program.rirByWeek[week] ? ` · RIR ${p.rir}` : ''}{p.reason && p.reason.startsWith('Held') ? ` · ${p.reason}` : ''}</div></>}
+                    : <>{p.ramp.length > 0 && <div className="muted small">Warm-up sets: {p.ramp.map(r => `${r.weight} × ${r.reps}`).join(', ')}</div>}<div className="muted small">{schemeText(p)}{p.rir !== program.rirByWeek[week] ? ` · RIR ${p.rir}` : ''}{p.reason && p.reason.startsWith('Held') ? ` · ${p.reason}` : ''}</div></>}
                 </div>
                 {!logged && <div className="muted nowrap right">{p.usesWeight ? (p.targets[0]?.weight != null ? `${p.targets[0].weight} kg` : 'Find load') : 'Bodyweight'}</div>}
                 {logged && done.length > 0 && <span className="ok"><Icon name="check" size={18} /></span>}

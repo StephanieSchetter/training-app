@@ -212,7 +212,7 @@ export function GymSession({ sessionId }: { sessionId: string }) {
               </button>
             );
           })}
-          <p className="lead">{session.warmupOnly ? 'Readiness is very low, so today is warm-up and stretching only.' : 'Each main lift then starts with its own ramp-up sets. They are listed on its screen with the weights to use.'}</p>
+          <p className="lead">{session.warmupOnly ? 'Readiness is very low, so today is warm-up and stretching only.' : 'Each lift then starts with its own warm-up sets, with the weights to use. Log them with Done like any set; they never count.'}</p>
         </main>
         <Dock><button className="btn primary" onClick={() => setPhase(session.warmupOnly ? 'finish' : 'lifts')}>{session.warmupOnly ? 'Done for today' : 'Start lifting'}</button></Dock>
         {leaveSheet}
@@ -357,7 +357,7 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
         <div className="card list">
           {sets.filter(s => s.rampUp && block.some(b => b.ex === s.exId)).map(s => (
             <button className="setrow done" key={s.id} onClick={() => update(st => { st.sets = st.sets.filter(x => x.id !== s.id); })}>
-              <span className="circle sm" /><span className="grow">Ramp-up</span><span className="muted">{s.weight} kg × {s.reps}</span><span className="muted"><Icon name="trash" size={16} /></span>
+              <span className="circle sm" /><span className="grow">Warm-up set</span><span className="muted">{s.weight} kg × {s.reps}</span><span className="muted"><Icon name="trash" size={16} /></span>
             </button>
           ))}
           {steps.map((s, i) => (
@@ -528,6 +528,9 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const [rir, setRir] = useState<number | null>(done ? done.rir : null);
   const [controlled, setControlled] = useState(done ? !!done.controlled : false);
   const [assist, setAssist] = useState<string>(done?.assist ?? item.assist ?? 'band');
+  // What set 1 would be pre-filled with, to come back to after the warm-up sets.
+  const working = useRef({ weight, reps });
+  const [skipWarm, setSkipWarm] = useState(false);
 
   const bump = (dir: number) => {
     if (item.equip === 'kettlebell' && gym.kettlebells.length) {
@@ -552,7 +555,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       controlled: item.scheme.t === 'legraise' || item.scheme.t === 'stage' ? controlled : undefined,
       assist: item.scheme.t === 'nordic' ? assist : undefined,
       level: item.level,
-      suggestedWeight: target.weight, suggestedReps: target.reps, ts: done?.ts ?? Date.now(),
+      suggestedWeight: rampUp && pending ? pending.weight : target.weight, suggestedReps: rampUp && pending ? pending.reps : target.reps, ts: done?.ts ?? Date.now(),
     };
     write('sets', id, s => {
       const i = s.sets.findIndex(x => x.id === id);
@@ -570,40 +573,50 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   };
 
   const canRamp = !done && round === 0 && side !== 'R' && item.usesWeight && !sets.some(s => s.exId === item.ex && !s.rampUp && !s.extra);
-  // Main lifts open with their ramp-up sets: ticked off in order, logged as ramp-ups, never counted.
+  // Warm-up sets come first (changed 15 Oct 2026): the screen shows the next one, pre-filled and editable,
+  // and the main Done button logs it as a warm-up that never counts. Skip goes straight to set 1.
   const rampDone = sets.filter(s => s.exId === item.ex && s.rampUp).length;
   const showRamp = canRamp && (item.isMain || item.ramp.length > 0);
-  const logRamp = (t: { weight: number | null; reps: number }) => {
-    navigator.vibrate?.(25);
-    const id = uid();
-    write('sets', id, s => { s.sets.push({ id, sessionId: session.id, exId: item.ex, plannedExId: item.plannedEx, setNo: 0, weight: t.weight, reps: t.reps, rir: null, rampUp: true, level: item.level, suggestedWeight: t.weight, suggestedReps: t.reps, ts: Date.now() }); });
-    onLogged(null);
-  };
+  const pending = showRamp && !skipWarm && rampDone < item.ramp.length ? item.ramp[rampDone] : null;
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (pending) { setWeight(pending.weight); setReps(pending.reps); }
+    else if (wasPending.current) { setWeight(working.current.weight); setReps(working.current.reps); }
+    wasPending.current = !!pending;
+  }, [rampDone, !!pending]); // eslint-disable-line react-hooks/exhaustive-deps
   const unit = item.scheme.t === 'fixed' && item.scheme.unit ? item.scheme.unit : 'reps';
 
   return (
     <>
       {showRamp && (
         <div className="card">
-          <div className="overline">Ramp-up first · not counted</div>
+          <div className="overline">Warm-up sets · not counted</div>
           {item.ramp.length > 0 ? (
             <>
               <div className="list">
                 {item.ramp.map((t, i) => (
-                  <button key={i} className={'setrow planrow' + (i < rampDone ? ' done' : '')} disabled={i !== rampDone} aria-label={`Ramp-up ${i + 1}`} onClick={() => logRamp(t)}>
+                  <div key={i} className={'setrow planrow' + (i < rampDone ? ' done' : '') + (pending && i === rampDone ? ' cur' : '')}>
                     <span className={'circle sm' + (i < rampDone ? ' on' : '')}>{i < rampDone && <Icon name="check" size={14} />}</span>
                     <span className="grow">{fmtKg(t.weight)} × {t.reps}{item.info.eachSide ? ' each side' : ''}</span>
-                    {i === rampDone && <span className="muted small">Tap when done</span>}
-                  </button>
+                    {pending && i === rampDone && <span className="muted small">Now</span>}
+                  </div>
                 ))}
               </div>
+              {pending && <button className="btn ghost" onClick={() => setSkipWarm(true)}>Skip warm-up sets</button>}
               <div className="muted small">{item.ramp.length > 1 ? 'Easy and crisp, about a minute between them. Then rest 2–3 minutes before the first working set below.' : 'Light and easy, just to groove the movement. Then straight into the first working set below.'}</div>
             </>
           ) : (
-            <div className="muted">Build up over 2–3 lighter sets: about half, then three-quarters of what you expect to lift, for a few easy reps each. Log each one with "Log as ramp-up set" below, then do your first counted set.</div>
+            <div className="muted">Build up over 2–3 lighter sets: about half, then three-quarters of what you expect to lift, for a few easy reps each. Log each one with "Log as warm-up set" below, then do your first counted set.</div>
           )}
         </div>
       )}
+      {pending ? (
+        <div className="card target-card">
+          <div className="row"><div className="overline">Warm-up set {rampDone + 1} of {item.ramp.length} · not counted</div></div>
+          <div className="targ">{fmtKg(pending.weight)}<span className="times"> × {pending.reps}{item.info.eachSide ? ' each side' : ''}</span></div>
+          <div className="row meta"><span className="muted">Then set 1: {findLoad ? 'find your load' : fmtKg(target.weight)} × {item.repsLabel[0]}</span></div>
+        </div>
+      ) : (
       <div className={'card target-card' + (done ? ' editing' : '')}>
         <div className="row">
           <div className="overline">{done ? 'Editing · ' : ''}Set {round + 1} of {item.targets.length}{side ? ` · ${sideName(side)} side` : ''}</div>
@@ -619,16 +632,17 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
         </div>
         {item.before && round === 0 && !done && <div className="notice inline"><Icon name="info" size={16} /> {item.before}</div>}
       </div>
+      )}
 
       {item.usesWeight && (
         <Stepper label="Weight" unit={item.equip === 'added' ? 'kg added' : item.equip === 'dumbbell' ? 'kg each' : item.info.perSide ? 'kg each side' : 'kg'} value={weight} onMinus={() => bump(-1)} onPlus={() => bump(1)} onType={setWeight} />
       )}
       <Stepper label={unit === 'reps' ? 'Reps' : 'Distance'} unit={unit} value={reps} onMinus={() => setReps(r => Math.max(0, r - 1))} onPlus={() => setReps(r => r + 1)} />
 
-      <div className="field">
+      {!pending && <div className="field">
         <div className="field-label">Reps left in the tank (RIR)</div>
         <Segmented options={RIRS.map((label, value) => ({ value, label }))} value={rir} onChange={setRir} />
-      </div>
+      </div>}
 
       {item.scheme.t === 'stage' && (
         <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
@@ -651,15 +665,15 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
 
       <Dock>
         {timer}
-        {canRamp && <button className="btn slim" disabled={weight === null} onClick={() => save(true)}>Log as ramp-up set</button>}
+        {canRamp && !pending && <button className="btn slim" disabled={weight === null} onClick={() => save(true)}>Log as warm-up set (not counted)</button>}
         {done && (
           <div className="grid2">
             <button className="btn danger" onClick={remove}>Delete set</button>
             <button className="btn" onClick={onCancelEdit}>Cancel</button>
           </div>
         )}
-        <button className="btn primary" disabled={item.usesWeight && weight === null} onClick={() => save(false)}>
-          {done ? 'Save change' : item.usesWeight && weight === null ? 'Enter a weight' : 'Done'}
+        <button className="btn primary" disabled={item.usesWeight && weight === null} onClick={() => save(!!pending)}>
+          {done ? 'Save change' : item.usesWeight && weight === null ? 'Enter a weight' : pending ? 'Done · warm-up set' : 'Done'}
         </button>
       </Dock>
     </>

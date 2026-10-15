@@ -15,7 +15,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const results = [];
 const check = (name, pass, detail) => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + String(detail).replace(/\s+/g, ' ').slice(0, 220) : ''}`); };
 // Previews list ramp-up sets under each lift (14 Oct 2026); these checks read the working weights, so drop those lines.
-const text = () => page.evaluate(() => document.body.innerText.replace(/\nRamp-up: [^\n]*/g, ''));
+const text = () => page.evaluate(() => document.body.innerText.replace(/\nWarm-up sets: [^\n]*/g, ''));
 const shot = async name => { if (out) { await wait(300); await page.screenshot({ path: join(out, `stack-${name}.png`) }); } };
 const click = async (label, nth = 0) => {
   const ok = await page.evaluate((label, nth) => {
@@ -54,6 +54,7 @@ for (let i = 0; i < 3; i++) await click('Next exercise');
 let t = await text();
 check('The row is labelled as weight on one side', /Iso-Lateral Row/i.test(t) && /kg each side/i.test(t), t.slice(0, 200));
 for (let i = 0; i < 2; i++) await click('Next exercise');
+await click('Skip warm-up sets');   // warm-up sets come first since 15 Oct
 t = await text();
 check('On the day it says where the weight came from', /Leg Extension/i.test(t) && t.includes('65 kg') && t.includes('Agreed at your review on 13 Oct'), t.slice(0, 260));
 for (let i = 0; i < 2; i++) await click('Next exercise');

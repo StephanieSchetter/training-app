@@ -161,7 +161,7 @@ async function fresh(date, { catchUp = false, setup } = {}) {
   const sun = await a.text();
   check('14: back-flare week, Sunday leaves out single-leg RDL and keeps the back extension pair', sun.includes('Left out this week (back flare): Single-Leg Romanian Deadlift') && !sun.split('THE PLAN')[1].split('Left out this week')[0].includes('Single-Leg Romanian') && sun.includes('45° Back Extension'), sun.split('THE PLAN')[1]);
   await a.click('Back'); await a.day(22); await a.click('Gym C');
-  const c = (await a.text()).replace(/\nRamp-up: [^\n]*/g, '');
+  const c = (await a.text()).replace(/\nWarm-up sets: [^\n]*/g, '');
   check('14: next Gym C has deadlift back at 3 x 8, 10% lighter (60 -> 55 kg), not swapped', /Conventional Deadlift[\s\S]{0,60}55 kg/.test(c) && c.includes('3 × 8') && !c.includes('Swapped from Conventional'), c.split('THE PLAN')[1]);
   check('14: bench (not back-tagged) is unchanged at 30 kg', /Flat Dumbbell Bench Press[\s\S]{0,40}30 kg/.test(c));
   await a.close();

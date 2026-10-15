@@ -49,7 +49,7 @@ await click('Next exercise');
 await click('Skip');
 await shot('first-set');
 for (let i = 0; i < 8; i++) await click('More Weight');
-await click('Log as ramp-up');
+await click('Log as warm-up');
 for (let i = 0; i < 2; i++) await click('More Weight');
 await click('2', 0); await shot('ready-to-log');
 await click('Done'); await shot('resting');

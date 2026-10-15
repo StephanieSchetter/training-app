@@ -3,7 +3,7 @@
 import { EnergyDay, estimateMaintenance, Maintenance, Targets, targets, trendWeights } from './engine/energy';
 import { addDays } from './engine/schedule';
 import type { Series } from './stats';
-import { AppState } from './store';
+import { AppState, gymForDate } from './store';
 
 const HISTORY_DAYS = 120;
 
@@ -17,7 +17,8 @@ export function energyDays(state: AppState, today: string): EnergyDay[] {
   const out: EnergyDay[] = [];
   for (let d = dates[0]; d < today; d = addDays(d, 1)) {
     const g = state.garminDays[d];
-    out.push({ date: d, weight: kg.get(d) ?? null, kcalIn: g?.kcalIn ?? null, kcalOut: g?.kcalOut ?? null });
+    // At FIFO Brad weighs on the gym's scale; at home on his own. Each gets its own baseline.
+    out.push({ date: d, weight: kg.get(d) ?? null, kcalIn: g?.kcalIn ?? null, kcalOut: g?.kcalOut ?? null, scale: gymForDate(state, d).id });
   }
   return out;
 }

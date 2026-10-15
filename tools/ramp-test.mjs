@@ -30,27 +30,31 @@ const ramps = () => page.evaluate(() => window.__dev.getState().sets.filter(s =>
 // Thursday of week 1 at Port Hedland: the deadlift starts at 70 kg
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-15', { waitUntil: 'networkidle0' }); await wait(250);
 await click('Start Gym C'); await click('Start warm-up');
-check('The warm-up screen points to the ramp-up sets', (await text()).includes('Each main lift then starts with its own ramp-up sets'));
+check('The warm-up screen points to the ramp-up sets', (await text()).includes('Each lift then starts with its own warm-up sets'));
 await click('Start lifting');
 await click('Next exercise');                 // past the back-extension primer
 await click('1.25');                          // smallest plate at this gym, asked once
 let t = await text();
-check('Deadlift at 70 kg shows three ramp-up sets', /RAMP-UP FIRST/i.test(t) && t.includes('35 kg × 5') && t.includes('50 kg × 3') && t.includes('60 kg × 1'), t.split(/RAMP-UP FIRST/i)[1]);
+check('Deadlift at 70 kg shows three ramp-up sets', /WARM-UP SETS · NOT COUNTED/i.test(t) && t.includes('35 kg × 5') && t.includes('50 kg × 3') && t.includes('60 kg × 1'), t.split(/WARM-UP SETS · NOT COUNTED/i)[1]);
 await shot('deadlift');
-await click('Ramp-up 1');
+check('The set screen shows warm-up set 1, pre-filled', /WARM-UP SET 1 OF 3/i.test(await text()) && (await page.evaluate(() => document.querySelector('.stepper input').value)) === '35');
+await click('Done · warm-up set');
 check('Ticking one logs it as a ramp-up', (await ramps()) === 'deadlift:35x5', await ramps());
-await click('Ramp-up 2'); await click('Ramp-up 3');
-check('All three logged in order', (await ramps()) === 'deadlift:35x5,deadlift:50x3,deadlift:60x1', await ramps());
+await page.evaluate(() => { const i = document.querySelector('.stepper input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, '52.5'); i.dispatchEvent(new Event('input', { bubbles: true })); });
+await click('Done · warm-up set'); await click('Done · warm-up set');
+check('A warm-up set can be changed before logging it', (await ramps()).includes('deadlift:52.5x3'), await ramps());
+check('After the warm-ups the screen is back on set 1 at the working weight', /SET 1 OF 3/i.test(await text()) && (await page.evaluate(() => document.querySelector('.stepper input').value)) === '70');
+check('All three logged in order', (await ramps()) === 'deadlift:35x5,deadlift:52.5x3,deadlift:60x1', await ramps());
 await click('Done');
 t = await text();
-check('After the first working set the ramp-up card is gone', !/RAMP-UP FIRST/i.test(t));
+check('After the first working set the ramp-up card is gone', !/WARM-UP SETS · NOT COUNTED/i.test(t));
 check('Ramp-ups are not counted as working sets', await page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'deadlift' && !s.rampUp).length === 1));
 await click('Skip'); await click('Done'); await click('Skip'); await click('Done'); await click('Skip');
 await click('Next exercise');
 t = await text();
-check('A main lift with no weight yet (week 1) explains how to build up instead', /RAMP-UP FIRST/i.test(t) && t.includes('Build up over 2–3 lighter sets') && /Flat Dumbbell Bench Press/i.test(t), t.slice(0, 260));
+check('A main lift with no weight yet (week 1) explains how to build up instead', /WARM-UP SETS · NOT COUNTED/i.test(t) && t.includes('Build up over 2–3 lighter sets') && /Flat Dumbbell Bench Press/i.test(t), t.slice(0, 260));
 await click('Next exercise');
-check('A bodyweight lift (pull-ups) has no ramp-up card', !/RAMP-UP FIRST/i.test(await text()), (await text()).slice(0, 120));
+check('A bodyweight lift (pull-ups) has no ramp-up card', !/WARM-UP SETS · NOT COUNTED/i.test(await text()), (await text()).slice(0, 120));
 
 // Week 3 in Adelaide: a second main lift of the session gets two sets
 await page.evaluate(() => window.__dev.update(s => {
@@ -64,7 +68,7 @@ await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-29', { wai
 await click('Start Gym C'); await click('Start warm-up'); await click('Start lifting');
 await click('Next exercise'); await click('Next exercise');
 t = await text();
-check('Second main lift of the day (bench at 32.5 kg) gets two ramp-up sets', /Flat Dumbbell Bench Press/i.test(t) && t.includes('20 kg × 5') && t.includes('25 kg × 2') && !t.includes('× 1\n'), t.split(/RAMP-UP FIRST/i)[1]);
+check('Second main lift of the day (bench at 32.5 kg) gets two ramp-up sets', /Flat Dumbbell Bench Press/i.test(t) && t.includes('20 kg × 5') && t.includes('25 kg × 2') && !t.includes('× 1\n'), t.split(/WARM-UP SETS · NOT COUNTED/i)[1]);
 await shot('bench');
 
 // 14 Oct: every weighted lift gets a lighter set first, and the preview lists them
@@ -72,7 +76,7 @@ await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; }
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-11-05', { waitUntil: 'networkidle0' }); await wait(250);
 await click('Gym C');   // next Thursday's preview (this test already started the 29 Oct one)
 t = await text();
-check('The session preview lists ramp-up weights', /Conventional Deadlift[\s\S]{0,40}Ramp-up: \d+ × 5, \d+ × 3/.test(t) && /Flat Dumbbell Bench Press[\s\S]{0,40}Ramp-up: [\d.]+ × 5, [\d.]+ × 2/.test(t), t.split('THE PLAN')[1]?.slice(0, 400));
+check('The session preview lists ramp-up weights', /Conventional Deadlift[\s\S]{0,40}Warm-up sets: \d+ × 5, \d+ × 3/.test(t) && /Flat Dumbbell Bench Press[\s\S]{0,40}Warm-up sets: [\d.]+ × 5, [\d.]+ × 2/.test(t), t.split('THE PLAN')[1]?.slice(0, 400));
 await page.evaluate(() => window.__dev.update(s => {
   const at = Date.now() - 3 * 86400000;
   s.sessions.push({ id: 'w2b', slotIdx: null, type: 'gymB', date: '2026-10-20', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
@@ -81,7 +85,7 @@ await page.evaluate(() => window.__dev.update(s => {
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-27', { waitUntil: 'networkidle0' }); await wait(250);
 await click('Gym B');
 t = await text();
-check('A non-main lift (incline curl) shows one lighter set in the preview', /Incline Dumbbell Curl[\s\S]{0,40}Ramp-up: 7\.5 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
+check('A non-main lift (incline curl) shows one lighter set in the preview', /Incline Dumbbell Curl[\s\S]{0,40}Warm-up sets: 7\.5 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
 
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} ramp-up checks passed` : `\n${results.filter(x => !x).length} of ${results.length} ramp-up checks FAILED`);

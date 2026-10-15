@@ -338,7 +338,7 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
       {weightDue && !VIEW_ONLY && (
         <div className="card">
           <div className="overline">Morning weigh-in</div>
-          <div className="muted small">First thing, after the toilet, before food or drink, same scale. Daily ups and downs are normal; the app follows the trend.{lastWeight ? ` Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : ''}</div>
+          <div className="muted small">{`${stint ? 'At the gym scale, before eating if you can.' : 'First thing, after the toilet, before food or drink.'} Missed days are fine, and the gym and home scales are kept apart. Daily ups and downs are normal; the app follows the trend.`}{lastWeight ? ` Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : ''}</div>
           <input inputMode="decimal" aria-label="Body weight in kg" value={kg} placeholder={lastWeight ? `${lastWeight.kg} kg` : 'kg'} onChange={e => setKg(e.target.value)} />
           {state.nutrition.protein[yesterday] === undefined && (
             <input inputMode="numeric" aria-label="Yesterday's protein in grams" value={protein} placeholder="Yesterday's protein in g (optional, from MyFitnessPal)" onChange={e => setProtein(e.target.value)} />

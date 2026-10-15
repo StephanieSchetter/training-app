@@ -12,7 +12,8 @@ const MIN_GARMIN_KCAL = 1500;
 export const NEED = { intakeDays: 10, weighIns: 8, spanDays: 14 };
 const WINDOW = 28;
 
-export interface EnergyDay { date: string; weight?: number | null; kcalIn?: number | null; kcalOut?: number | null }
+/** scale: which scale the weigh-in was on (home, or the gym at FIFO). Each scale keeps its own baseline. */
+export interface EnergyDay { date: string; weight?: number | null; kcalIn?: number | null; kcalOut?: number | null; scale?: string }
 
 export interface Maintenance {
   source: 'measured' | 'garmin';
@@ -48,22 +49,28 @@ export function estimateMaintenance(days: EnergyDay[]): Maintenance | null {
   const recent = days.slice(-WINDOW);
   const intake = recent.map(d => d.kcalIn).filter((k): k is number => k != null && k >= MIN_LOGGED_KCAL);
   const burns = recent.map(d => d.kcalOut).filter((k): k is number => k != null && k >= MIN_GARMIN_KCAL);
-  const w = recent.filter(d => d.weight != null).map(d => ({ x: dayNo(d.date), y: d.weight! }));
+  const w = recent.filter(d => d.weight != null).map(d => ({ x: dayNo(d.date), y: d.weight!, g: d.scale ?? '' }));
   const garminAvg = burns.length ? r10(mean(burns)) : null;
   const span = w.length ? w.at(-1)!.x - w[0].x : 0;
   const base = { intakeDays: intake.length, weighIns: w.length, avgIntake: intake.length ? r10(mean(intake)) : null, garminAvg };
 
   if (intake.length >= NEED.intakeDays && w.length >= NEED.weighIns && span >= NEED.spanDays) {
-    const mx = mean(w.map(p => p.x)), my = mean(w.map(p => p.y));
-    const sxx = w.reduce((a, p) => a + (p.x - mx) ** 2, 0);
-    const slope = w.reduce((a, p) => a + (p.x - mx) * (p.y - my), 0) / sxx;
-    const resid = w.reduce((a, p) => a + (p.y - (my + slope * (p.x - mx))) ** 2, 0);
-    const seSlope = Math.sqrt(resid / Math.max(1, w.length - 2) / sxx);
+    // One trend line, but each scale gets its own level (a gym scale after breakfast reads differently from
+    // the bathroom scale at home), so switching scales at the start or end of a stint isn't read as weight change.
+    const groups = [...new Set(w.map(p => p.g))];
+    const centre = new Map(groups.map(g => { const ps = w.filter(p => p.g === g); return [g, { x: mean(ps.map(p => p.x)), y: mean(ps.map(p => p.y)) }]; }));
+    const dx = (p: typeof w[number]) => p.x - centre.get(p.g)!.x, dy = (p: typeof w[number]) => p.y - centre.get(p.g)!.y;
+    const sxx = w.reduce((a, p) => a + dx(p) ** 2, 0);
+    if (sxx > 0) {
+    const slope = w.reduce((a, p) => a + dx(p) * dy(p), 0) / sxx;
+    const resid = w.reduce((a, p) => a + (dy(p) - slope * dx(p)) ** 2, 0);
+    const seSlope = Math.sqrt(resid / Math.max(1, w.length - groups.length - 1) / sxx);
     const m = mean(intake);
     const sdIntake = Math.sqrt(intake.reduce((a, k) => a + (k - m) ** 2, 0) / Math.max(1, intake.length - 1));
     const kcal = m - slope * KCAL_PER_KG;
     const half = 1.96 * Math.sqrt((seSlope * KCAL_PER_KG) ** 2 + (sdIntake / Math.sqrt(intake.length)) ** 2);
     return { source: 'measured', kcal: r10(kcal), low: r10(kcal - half), high: r10(kcal + half), ...base, kgPerWeek: Math.round(slope * 7 * 100) / 100 };
+    }
   }
   if (garminAvg === null) return null;
   return { source: 'garmin', kcal: garminAvg, low: r10(garminAvg * 0.85), high: r10(garminAvg * 1.15), ...base, kgPerWeek: null };

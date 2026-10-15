@@ -52,7 +52,7 @@ function Lift({ state, exId, name }: { state: AppState; exId: string; name: stri
               <LineChart series={c.added} stints={state.stints} format={v => `${v} kg`} />
             </>
           )}
-          {c.kind === 'max' && <div className="muted small">From the top set each session: weight × (1 + reps ÷ 30). Ramp-ups and deload weeks are left out.</div>}
+          {c.kind === 'max' && <div className="muted small">From the top set each session: weight × (1 + reps ÷ 30). Warm-up sets and deload weeks are left out.</div>}
           {c.kind === 'percent' && <div className="muted small">The machines differ between gyms, so each gym is measured against its own first session.</div>}
         </div>
       )}

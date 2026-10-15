@@ -325,6 +325,16 @@ describe('calories from weight and food', () => {
     expect(estimateMaintenance([])).toBeNull();
   });
 
+  it('switching to a gym scale that reads 1.5 kg heavier is not mistaken for weight gain', () => {
+    const d = days(28, i => ({ weight: 96 - 0.05 * i + (i >= 14 ? 1.5 : 0), scale: i >= 14 ? 'fifo' : 'adelaide', kcalIn: 2600, kcalOut: 3000 }));
+    const m = estimateMaintenance(d)!;
+    expect(m.kgPerWeek).toBeCloseTo(-0.35, 2);
+    expect(Math.abs(m.kcal - 2985)).toBeLessThanOrEqual(10);
+    // and with gaps (early shifts, no weigh-in) it still works
+    const gappy = d.map((x, i) => (i % 3 === 1 ? { ...x, weight: null } : x));
+    expect(Math.abs(estimateMaintenance(gappy)!.kcal - 2985)).toBeLessThanOrEqual(10);
+  });
+
   it('trend weight moves a tenth of the way each weigh-in', () => {
     expect(trendWeights([{ date: 'a', weight: 96 }, { date: 'b' }, { date: 'c', weight: 97 }]).map(t => t.trend)).toEqual([96, 96, 96.1]);
   });

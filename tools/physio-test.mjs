@@ -45,7 +45,7 @@ async function fresh(date, spec, extra) {
   };
   const day = async num => { await page.evaluate(num => [...document.querySelectorAll('.cal-day:not(.out)')].find(b => b.querySelector('.cal-num').textContent === String(num)).click(), num); await wait(150); };
   // Opens the preview of the session on a given day of the visible month and returns its "plan" text.
-  const plan = async (num, name) => { await click('Calendar'); await day(num); await click(name); const t = await text(); await click('Back'); await click('Today'); return (t.split('THE PLAN')[1] ?? t).replace(/\nRamp-up: [^\n]*/g, ''); };
+  const plan = async (num, name) => { await click('Calendar'); await day(num); await click(name); const t = await text(); await click('Back'); await click('Today'); return (t.split('THE PLAN')[1] ?? t).replace(/\nWarm-up sets: [^\n]*/g, ''); };
   const shot = name => wait(250).then(() => page.screenshot({ path: join(out, `physio-${name}.png`) }));
   return { page, text, click, day, plan, shot, close: () => ctx.close() };
 }
@@ -120,6 +120,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const live = await fresh('2026-10-22', [wk1C({}, dl(70))], () => window.__dev.update(s => { s.profiles.find(p => p.id === 'fifo').smallestPlate = 2.5; }));
   await live.click('Start Gym C'); await live.click('Start warm-up'); await live.click('Start lifting');
   await live.click('Done'); await live.click('Done'); await live.click('Skip'); await live.click('Next exercise');
+  await live.click('Skip warm-up sets');   // warm-up sets come first since 15 Oct
   const before = await live.page.evaluate(() => document.querySelector('.stepper input')?.value);
   await live.click('More Weight');
   await live.click('Done'); await live.click('Skip');
