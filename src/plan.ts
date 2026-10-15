@@ -181,6 +181,26 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           const top = earned ? oneStepUp(prev.result.weight, equip, gym, ex) : roundNearest(prev.result.weight, equip, gym, ex);
           targets = rptSets(top, scheme.reps, scheme.reps[0], ctx());
           reason = earned ? 'All straight sets done: one step up, now reverse pyramid' : 'Same weight, now reverse pyramid';
+        } else {
+          // Back-off sets never go below what was already done for their reps last time (15 Oct 2026: the
+          // 10% drops from an unchanged top set were suggesting less than Brad had just lifted). Hit the
+          // target -> keep that weight; 2 or more reps over -> one step up. Never above the top set.
+          const last = past.filter(p => !p.result.deload && (equip !== 'machine' || p.session.gymId === gym.id)).at(-1);
+          const wasRpt = !!last && schemeIn(item, last.session.week).t === 'rpt';
+          const top = targets[0]?.weight;
+          if (last && wasRpt && top != null) {
+            targets = targets.map((t, i) => {
+              if (i === 0 || t.weight === null) return t;
+              const done = last.sets.filter(x => x.setNo === i + 1 && !x.rampUp && !x.extra && x.weight != null);
+              if (!done.length) return t;
+              const w = Math.min(...done.map(x => x.weight!));
+              const reps = Math.min(...done.map(x => x.reps));
+              const want = scheme.reps[i];
+              if (reps < want) return t;
+              const floor = reps >= want + 2 ? oneStepUp(w, equip, gym, ex) : roundNearest(w, equip, gym, ex);
+              return { ...t, weight: Math.min(top, Math.max(t.weight, floor)) };
+            });
+          }
         }
         break;
       }

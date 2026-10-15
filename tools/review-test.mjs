@@ -90,6 +90,19 @@ await click('Save check-in');
 t = await text();
 check('"Stiff" is saved and changes nothing: no hold, no offers', (await page.evaluate(() => window.__dev.getState().checkins.at(-1).back)) === 'stiff' && !/SUGGESTION · /i.test(t));
 
+// 15 Oct: back-off sets never drop below what was already done for their reps
+const backoffs = await page.evaluate(async () => {
+  const pl = await import('/src/plan.ts');
+  const s = structuredClone(window.__dev.getState());
+  const at = Date.now() - 86400000;
+  s.profiles.find(p => p.id === 'fifo').machineSteps = { ...s.profiles.find(p => p.id === 'fifo').machineSteps, lat_pulldown: 2.5 };
+  s.sessions.push({ id: 'c15', slotIdx: null, type: 'gymC', date: '2026-10-15', gymId: 'fifo', week: 1, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
+  [[1, 65, 8], [2, 60, 10], [3, 55, 12]].forEach(([setNo, weight, reps]) => s.sets.push({ id: `lp${setNo}`, sessionId: 'c15', exId: 'lat_pulldown', plannedExId: 'lat_pulldown', setNo, weight, reps, rir: 1, suggestedWeight: null, suggestedReps: reps, ts: at + setNo }));
+  const next = { id: 'x', slotIdx: null, type: 'gymC', date: '2026-10-22', gymId: 'fifo', week: 2, swaps: {}, warmup: [], startedAt: Date.now() };
+  return pl.buildPlan(s, next).find(p => p.ex === 'lat_pulldown').targets.map(t => `${t.weight}x${t.reps}`).join(' ');
+});
+check('Lat pulldown next week: top 65 for 9, and the back-off sets stay at 60 and 55 (not 57.5 and 52.5)', backoffs === '65x9 60x10 55x12', backoffs);
+
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} review checks passed` : `\n${results.filter(x => !x).length} of ${results.length} review checks FAILED`);
 process.exit(results.every(Boolean) ? 0 : 1);
