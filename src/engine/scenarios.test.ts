@@ -243,6 +243,19 @@ describe('running', () => {
   });
 });
 
+describe('light dumbbells go in 1 kg steps up to 10 kg', () => {
+  const lat = (gym: GymProfile): LiftCtx => ({ exId: 'lateral_raise', equip: 'dumbbell', gym, week: 2 });
+  it('9 kg stays 9; above 10 the gym\'s own step', () => {
+    expect(roundNearest(9, 'dumbbell', fifo, 'lateral_raise')).toBe(9);
+    expect(oneStepUp(9, 'dumbbell', fifo, 'lateral_raise')).toBe(10);
+    expect(oneStepUp(10, 'dumbbell', fifo, 'lateral_raise')).toBe(12);
+    expect(oneStepUp(10, 'dumbbell', adelaide, 'lateral_raise')).toBe(12.5);
+    expect(nudge(12.5, -1, 'dumbbell', adelaide, 'x')).toBe(10);
+    expect(nudge(10, -1, 'dumbbell', adelaide, 'x')).toBe(9);
+    expect(suggestStraight(3, [12, 15], [{ gymId: 'fifo', weight: 9, reps: [15, 13, 12] }], lat(fifo)).sets[0].weight).toBe(10);
+  });
+});
+
 describe('ramp-up sets before a main lift', () => {
   const sets = (top: number, kind: 'first' | 'main' | 'other', ctx: LiftCtx) => rampSets(top, kind, ctx).map(s => `${s.weight}x${s.reps}`).join(' ');
   const deadlift: LiftCtx = { exId: 'deadlift', equip: 'barbell_heavy', gym: adelaide, week: 1 };
@@ -259,14 +272,14 @@ describe('ramp-up sets before a main lift', () => {
   });
 
   it('other weighted lifts get one lighter set', () => {
-    expect(sets(12, 'other', press)).toBe('7.5x6');
+    expect(sets(12, 'other', press)).toBe('7x6');
     expect(sets(65, 'other', { exId: 'leg_extension', equip: 'machine', gym: { ...adelaide, machineSteps: { leg_extension: 2.5 } }, week: 2 })).toBe('40x6');
   });
 
   it('a barbell never goes below the empty bar, and repeats or the working weight itself are dropped', () => {
     expect(sets(30, 'first', incline)).toBe('20x5 25x1');
     expect(sets(20, 'first', incline)).toBe('');
-    expect(sets(7.5, 'first', press)).toBe('2.5x5 5x3');
+    expect(sets(7.5, 'first', press)).toBe('4x5 5x3 6x1');
   });
 });
 

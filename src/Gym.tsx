@@ -647,13 +647,13 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       {item.scheme.t === 'stage' && (
         <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
           <span className="circle">{controlled && <Icon name="check" size={18} />}</span>
-          <span className="check-body"><b>Controlled</b><span className="small muted">12 reps on every set, both sides, all ticked controlled, moves you up a stage.</span></span>
+          <span className="check-body"><b>Controlled</b><span className="small muted">Tick it whenever the set was controlled, whatever the reps. The stage goes up once every set, both sides, is 12 reps and ticked.</span></span>
         </button>
       )}
       {item.scheme.t === 'legraise' && (
         <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
           <span className="circle">{controlled && <Icon name="check" size={18} />}</span>
-          <span className="check-body"><b>Controlled, no swing</b><span className="small muted">Needed on all 3 sets to move up a level.</span></span>
+          <span className="check-body"><b>Controlled, no swing</b><span className="small muted">Tick it whenever the set was controlled. The level goes up once all 3 sets reach the target and are ticked.</span></span>
         </button>
       )}
       {item.scheme.t === 'nordic' && (

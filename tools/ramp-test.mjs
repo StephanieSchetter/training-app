@@ -85,7 +85,7 @@ await page.evaluate(() => window.__dev.update(s => {
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-27', { waitUntil: 'networkidle0' }); await wait(250);
 await click('Gym B');
 t = await text();
-check('A non-main lift (incline curl) shows one lighter set in the preview', /Incline Dumbbell Curl[\s\S]{0,40}Warm-up sets: 7\.5 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
+check('A non-main lift (incline curl) shows one lighter set in the preview (7 kg: light dumbbells go in 1 kg steps)', /Incline Dumbbell Curl[\s\S]{0,40}Warm-up sets: 7 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
 
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} ramp-up checks passed` : `\n${results.filter(x => !x).length} of ${results.length} ramp-up checks FAILED`);

@@ -33,7 +33,11 @@ export function gridStep(equip: Equip, gym: GymProfile, exId: string): number | 
 }
 
 /** A machine stack with two step sizes, e.g. 5 kg steps up to 60 kg and 10 kg steps above. Null for an even stack. */
+/** Both gyms have light dumbbells in 1 kg steps up to 10 kg; above that the gym's usual step (16 Oct 2026). */
+export const LIGHT_DUMBBELLS = { upTo: 10, step: 1 };
+
 function stack(equip: Equip, gym: GymProfile, exId: string): { step: number; from: number; then: number } | null {
+  if (equip === 'dumbbell' && gym.dumbbellStep > LIGHT_DUMBBELLS.step) return { step: LIGHT_DUMBBELLS.step, from: LIGHT_DUMBBELLS.upTo, then: gym.dumbbellStep };
   const step = gym.machineSteps[exId];
   const c = gym.machineChange?.[exId];
   return equip === 'machine' && step && c && c.from > 0 && c.step > 0 ? { step, from: c.from, then: c.step } : null;
