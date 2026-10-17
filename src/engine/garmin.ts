@@ -38,21 +38,39 @@ export function matchRepLaps<L extends { sec: number }>(laps: L[], reps: Rep[]):
   if (!reps.every(r => Math.abs((r.km / r.speed) * 3600 - want) < 1)) return null;
   const tol = 0.12;
   const isRep = (l: L | undefined) => !!l && Math.abs(l.sec - want) <= want * tol;
-  let best: number[] = [];
-  for (let i = 0; i < laps.length; i++) {
-    if (!isRep(laps[i])) continue;
-    const chain = [i];
-    for (let j = i; isRep(laps[j + 2]) && !isRep(laps[j + 1]); j += 2) chain.push(j + 2);
+  // A rep can be one lap, or up to three in a row when the watch's 1 km auto-lap split it (17 Oct 2026).
+  type Span = { s: number; e: number };
+  const spans: Span[] = [];
+  for (let s = 0; s < laps.length; s++) {
+    let total = 0;
+    for (let e = s; e < Math.min(laps.length, s + 3); e++) {
+      total += laps[e].sec;
+      if (Math.abs(total - want) <= want * tol) { spans.push({ s, e }); break; }
+      if (total > want * (1 + tol)) break;
+    }
+  }
+  const joined = (sp: Span): L => {
+    if (sp.s === sp.e) return laps[sp.s];
+    const part = laps.slice(sp.s, sp.e + 1) as unknown as { sec: number; km?: number; avgHr?: number | null }[];
+    const sec = part.reduce((a, l) => a + l.sec, 0);
+    const hr = part.every(l => l.avgHr != null) ? part.reduce((a, l) => a + l.avgHr! * l.sec, 0) / sec : null;
+    return { ...laps[sp.s], sec, km: part.reduce((a, l) => a + (l.km ?? 0), 0), avgHr: hr } as unknown as L;
+  };
+  // Real reps have exactly one other lap (the recovery) between them.
+  let best: Span[] = [];
+  for (const first of spans) {
+    const chain = [first];
+    for (let next = spans.find(x => x.s === first.e + 2); next && !isRep(laps[chain.at(-1)!.e + 1]); next = spans.find(x => x.s === next!.e + 2)) chain.push(next);
     if (chain.length >= best.length) best = chain;
   }
   if (best.length >= 2) {
     const idx = best.slice(-reps.length);
-    const last = idx.at(-1)!;
+    const last = idx.at(-1)!.e;
     const cut = laps[last + 2];
     const stoppedEarly = idx.length < reps.length && !!cut && !isRep(laps[last + 1]) && cut.sec >= 20 && cut.sec < want * (1 - tol);
     return {
-      reps: [...idx.map(i => laps[i]), ...(stoppedEarly ? [cut] : [])],
-      recoveries: [...idx.slice(0, -1).map(i => laps[i + 1]), ...(stoppedEarly ? [laps[last + 1]] : [])],
+      reps: [...idx.map(joined), ...(stoppedEarly ? [cut] : [])],
+      recoveries: [...idx.slice(0, -1).map(sp => laps[sp.e + 1]), ...(stoppedEarly ? [laps[last + 1]] : [])],
       stoppedEarly,
     };
   }

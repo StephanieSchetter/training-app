@@ -90,6 +90,18 @@ await click('Save check-in');
 t = await text();
 check('"Stiff" is saved and changes nothing: no hold, no offers', (await page.evaluate(() => window.__dev.getState().checkins.at(-1).back)) === 'stiff' && !/SUGGESTION · /i.test(t));
 
+// 17 Oct: ending during the last rep after finishing it is not "couldn't finish"
+await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; s.activeRunId = null; }));
+await on('2026-10-24');
+await click('Open Threshold'); await click('Start this run');
+for (let i = 0; i < 6; i++) await click('Done');   // warm-up 2, rep 1, recovery, rep 2, recovery
+await click("Can't finish this rep?");
+await click('I finished this rep');
+t = await text();
+check('"I finished this rep" ticks it and asks the usual question', /could you have done 2 more reps/i.test(t), t.slice(-300));
+await click('No');
+check('Saved as all reps done with the real answer, cool-down skipped', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'no' && r.segs.filter(x => x.work).every(x => x.done) && !r.segs.at(-1).done; }));
+
 // 15 Oct: back-off sets never drop below what was already done for their reps
 const backoffs = await page.evaluate(async () => {
   const pl = await import('/src/plan.ts');

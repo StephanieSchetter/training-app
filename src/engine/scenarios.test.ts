@@ -188,6 +188,14 @@ describe('garmin matching', () => {
     expect(matchRepLaps([lap(1900)], reps)).toBeNull();
   });
 
+  it('17 Oct threshold: 8-minute reps split by the 1 km auto-lap are joined back up', () => {
+    const real = [[333, 114], [265, 142], [293, 153], [188, 162], [120, 154], [290, 161], [189, 170], [1, 172]].map(([sec, avgHr]) => lap(sec, avgHr));
+    const m = matchRepLaps(real, [{ km: 1.6267, speed: 12.2 }, { km: 1.6267, speed: 12.2 }])!;
+    expect(m.reps.map(l => Math.round(l.avgHr!))).toEqual([157, 165]);
+    expect(m.reps.map(l => l.sec)).toEqual([481, 479]);
+    expect(m.recoveries.map(l => l.avgHr)).toEqual([154]);
+  });
+
   it('too few rep-length laps -> could not match', () => {
     expect(matchLaps([lap(520), lap(209), lap(120), lap(210)], reps)).toBeNull();
     expect(matchLaps([lap(1900)], reps)).toBeNull();

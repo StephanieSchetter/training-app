@@ -171,6 +171,9 @@ export function RunSession({ runId }: { runId: string }) {
               ? `You ticked ${workDone} of ${workTotal} reps.`
               : run.practice ? 'Practice only: your answer changes nothing.' : `This sets next week's speed. You ran at ${speedNow} km/h today.`}
           </p>
+          {seg?.work && workDone === workTotal - 1 && (
+            <button className="btn option" onClick={() => patch(run.id, r => { r.segs[cur].done = true; })}><b>I finished this rep, just stopping here</b><span className="small muted">Ticks it, then asks the usual question. Skipping the cool-down is fine.</span></button>
+          )}
           {workDone === workTotal && (
             <>
               <button className="btn option" onClick={() => finish(run.id, 'yes', wrap())}><b>Yes</b><span className="small muted">Next week goes up to {(speedNow + 0.3).toFixed(1)} km/h</span></button>
