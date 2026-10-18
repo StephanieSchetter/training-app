@@ -143,7 +143,8 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const d = await fresh('2026-10-18');
   await d.click('Start Gym D');
   const s = (await d.text()).split("TODAY'S EXERCISES")[1];
-  const od = ['Single-Leg Romanian Deadlift', 'Dips', 'Nordic Curl', 'A1', 'Face Pull', 'A2', 'Hammer Curl', 'Single-Leg Calf Raise', 'B1', '45° Back Extension', 'B2', '45° Lateral Bend'];
+  const od = ['Single-Leg Romanian Deadlift', 'Dips', 'Lying Leg Curl',   // at FIFO Nordics swap to a lying leg curl (18 Oct)
+    'A1', 'Face Pull', 'A2', 'Hammer Curl', 'Single-Leg Calf Raise', 'B1', '45° Back Extension', 'B2', '45° Lateral Bend'];
   check('Sunday: order and pairs, side plank removed', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && !s.includes('Side Plank'), s);
   await d.close();
 }

@@ -115,6 +115,23 @@ const backoffs = await page.evaluate(async () => {
 });
 check('Lat pulldown next week: top 65 for 9, and the back-off sets stay at 60 and 55 (not 57.5 and 52.5)', backoffs === '65x9 60x10 55x12', backoffs);
 
+// 18 Oct: weighted dips as a reverse pyramid from 10 kg; lying leg curl for Nordics at FIFO, carrying on from 40 x 8
+const gymD = await page.evaluate(async () => {
+  const pl = await import('/src/plan.ts');
+  const s = structuredClone(window.__dev.getState());
+  const at = Date.now() - 86400000;
+  s.profiles.find(p => p.id === 'fifo').machineSteps = { ...s.profiles.find(p => p.id === 'fifo').machineSteps, lying_leg_curl: 5 };
+  s.sessions.push({ id: 'd18', slotIdx: null, type: 'gymD', date: '2026-10-18', gymId: 'fifo', week: 1, swaps: { nordic: 'lying_leg_curl' }, warmup: [], startedAt: at, finishedAt: at + 3600000 });
+  [[1, 40, 8], [2, 35, 10], [3, 30, 10]].forEach(([setNo, weight, reps]) => s.sets.push({ id: `lc${setNo}`, sessionId: 'd18', exId: 'lying_leg_curl', plannedExId: 'nordic', setNo, weight, reps, rir: 2, suggestedWeight: null, suggestedReps: reps, ts: at + setNo }));
+  [10, 10, 10, 9].forEach((reps, i) => s.sets.push({ id: `dp${i}`, sessionId: 'd18', exId: 'dips', plannedExId: 'dips', setNo: i + 1, weight: null, reps, rir: 3, suggestedWeight: null, suggestedReps: 8, ts: at + 10 + i }));
+  const swaps = pl.autoSwaps(s, 'fifo', 2);
+  const plan = pl.buildPlan(s, { id: 'x', slotIdx: null, type: 'gymD', date: '2026-10-25', gymId: 'fifo', week: 2, swaps, warmup: [], startedAt: Date.now() });
+  const show = id => { const p = plan.find(q => q.ex === id); return p ? `${p.title}: ${p.targets.map(t => `${t.weight}x${t.reps}`).join(' ')}` : 'missing'; };
+  return [show('dips'), show('lying_leg_curl')];
+});
+check('Next Gym D: dips weighted, reverse pyramid from 10 kg', gymD[0] === 'Dips (weighted): 10x6 10x8 7.5x10', gymD[0]);
+check('Next Gym D at FIFO: lying leg curl in place of Nordics, 40 kg for 9, back-offs held at 35 and 30', gymD[1] === 'Lying Leg Curl: 40x9 35x10 30x12', gymD[1]);
+
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} review checks passed` : `\n${results.filter(x => !x).length} of ${results.length} review checks FAILED`);
 process.exit(results.every(Boolean) ? 0 : 1);

@@ -158,7 +158,9 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
       // A swapped-in exercise that has its own place in the program brings its own scheme (back extension);
       // any other bodyweight move keeps the set count and has no weight rules.
       const home = everyItem.find(i => i.ex === ex && !i.warmup);
+      const viaSwap = program.swaps.find(s => s.from === item.ex && s.to === ex && s.scheme)?.scheme;
       if (home) scheme = schemeIn(home, week);
+      else if (viaSwap) scheme = viaSwap;
       else if (info.equip === 'bodyweight') scheme = { t: 'log', sets: setCount(scheme), reps: 10 };
     }
 
@@ -293,18 +295,27 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         break;
       }
       case 'dips': {
+        // Bodyweight until 4 x 10 (or a weight agreed at a review), then weighted as a reverse pyramid
+        // 6/8/10 like weighted pull-ups (changed 18 Oct 2026 from weighted straight sets).
         const bw = past.filter(p => p.sets.every(s => !s.weight));
-        if (bw.some(p => dipsGoWeighted(p.result.reps))) {
+        const weighted = history.filter(h => h.weight > 0);
+        const start = program.coachWeights?.find(c => c.ex === ex);
+        if (weighted.length || start || bw.some(p => dipsGoWeighted(p.result.reps))) {
           equip = 'added';
-          const weighted = history.filter(h => h.weight > 0);
-          const s = suggestStraight(scheme.sets, scheme.range, weighted, { ...ctx(), week: Math.max(week, 2) });
-          targets = weighted.length ? s.sets : s.sets.map(t => ({ ...t, weight: 2.5 }));
-          reason = weighted.length ? s.reason : '4 × 10 done: now weighted';
+          const sc = PULLUP_WEIGHTED.scheme;
+          if (!weighted.length) {
+            targets = rptSets(start?.kg ?? 2.5, sc, sc[0], { ...ctx(), equip });
+            reason = start ? `Agreed at your review on ${new Date(start.from + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}: now weighted` : '4 × 10 done: now weighted';
+          } else {
+            const s = suggestRpt(sc, weighted, { ...ctx(), equip, week: Math.max(week, 2) });
+            targets = s.sets; reason = s.reason;
+          }
+          repsLabel = sc.map(String);
           title = 'Dips (weighted)';
         } else {
           targets = Array.from({ length: scheme.sets }, () => ({ weight: null, reps: (scheme as { range: [number, number] }).range[0] }));
+          repsLabel = targets.map(() => range((scheme as { range: [number, number] }).range));
         }
-        repsLabel = targets.map(() => range((scheme as { range: [number, number] }).range));
         break;
       }
       case 'nordic': {
@@ -331,7 +342,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     // A weight agreed at a review stands in for the suggestion until the lift is next done. After that,
     // progression carries on from whatever was actually logged.
     const agreed = program.coachWeights?.find(c => c.ex === ex && (!c.gym || c.gym === gym.id));
-    if (agreed && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
+    if (agreed && scheme.t !== 'dips' && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
       const w = roundNearest(agreed.kg, equip, gym, ex);
       targets = scheme.t === 'rpt' ? rptSets(w, targets.map(t => t.reps), targets[0].reps, ctx()) : targets.map(t => ({ ...t, weight: w }));
       reason = `Agreed at your review on ${new Date(agreed.from + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;

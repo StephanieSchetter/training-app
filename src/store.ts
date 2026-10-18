@@ -49,7 +49,8 @@ export interface Program {
   lateralBendStages?: string[];
   exercises: Record<string, Exercise>;
   sessions: Record<string, { name: string; note?: string; items: ProgramItem[] }>;
-  swaps: { when: string; from: string; to: string; label: string }[];
+  /** scheme: how a swapped-in exercise with no place of its own in the program is done (e.g. leg curl for Nordics). */
+  swaps: { when: string; from: string; to: string; label: string; scheme?: Scheme }[];
   legRaiseLevels: { level: number; name: string; sets: number; range: [number, number] }[];
   /** Weights agreed at a review: used instead of the suggestion until the lift is next done after `from` (at that gym, if named). */
   coachWeights?: { ex: string; kg: number; gym?: string; from: string }[];
