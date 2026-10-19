@@ -47,7 +47,7 @@ async function fresh(date, { catchUp = false, setup } = {}) {
   const a = await fresh('2026-10-13');
   await a.click('Start Gym B');
   const t = await a.text();
-  check('6: FIFO calf swap shown on the start screen', /SWAPS AT THIS GYM[\s\S]*Standing Calf Raise[\s\S]*Single-Leg Calf Raise On A Step/.test(t));
+  check('6: FIFO calf swap shown on the start screen', /SWAPS AT THIS GYM[\s\S]*Standing Calf Raise[\s\S]*Leg Press Calf Raise/.test(t));
   await a.close();
 }
 

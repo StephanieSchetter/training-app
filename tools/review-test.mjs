@@ -46,7 +46,7 @@ await seed('oct13', 20, '2026-10-13', [
 await wait(300);
 await click('Gym B');
 check('Next Tuesday: leg extension is the 65 kg agreed at the review, not 70', (await line('Leg Extension')).includes('65 kg'), await line('Leg Extension'));
-check('Next Tuesday: calf raise is the agreed 8 kg', (await line('A1Single-Leg Calf Raise')).includes('8 kg'), await line('A1Single-Leg Calf Raise'));
+check('Next Tuesday at FIFO: calf raise is on the leg press (from 19 Oct), finding its load', (await line('A1Leg Press Calf Raise')).includes('Find load'), await line('A1Leg Press Calf Raise'));
 check('Lifts with nothing agreed are untouched (row stays 50 kg)', (await line('Iso-Lateral Row')).includes('50 kg'), await line('Iso-Lateral Row'));
 await click('Back');
 await click('Start Gym B'); await click('Start warm-up'); await click('Start lifting');
