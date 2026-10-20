@@ -42,12 +42,12 @@ async function fresh(date, { catchUp = false, setup } = {}) {
   return { page, text, click, day, on, shot, close: () => ctx.close() };
 }
 
-// 6: standing calf raise during FIFO -> swap shown automatically
+// 6: seated calf raise during FIFO -> swap shown automatically (Tuesday's calves are on the leg press at both gyms since 20 Oct)
 {
-  const a = await fresh('2026-10-13');
-  await a.click('Start Gym B');
+  const a = await fresh('2026-10-15');
+  await a.click('Start Gym C');
   const t = await a.text();
-  check('6: FIFO calf swap shown on the start screen', /SWAPS AT THIS GYM[\s\S]*Standing Calf Raise[\s\S]*Leg Press Calf Raise/.test(t));
+  check('6: FIFO calf swap shown on the start screen', /SWAPS AT THIS GYM[\s\S]*Seated Calf Raise[\s\S]*Seated Dumbbell-On-Knees Calf Raise/.test(t));
   await a.close();
 }
 

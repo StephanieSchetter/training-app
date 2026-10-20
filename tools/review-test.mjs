@@ -45,8 +45,8 @@ await seed('oct13', 20, '2026-10-13', [
 ]);
 await wait(300);
 await click('Gym B');
-check('Next Tuesday: leg extension is the 65 kg agreed at the review, not 70', (await line('Leg Extension')).includes('65 kg'), await line('Leg Extension'));
-check('Next Tuesday at FIFO: calf raise is on the leg press (from 19 Oct), finding its load', (await line('A1Leg Press Calf Raise')).includes('Find load'), await line('A1Leg Press Calf Raise'));
+check('Next Tuesday: leg extension is the weight agreed at the latest review (57.5, 20 Oct), not 70', (await line('Leg Extension')).includes('57.5 kg'), await line('Leg Extension'));
+check('Next Tuesday at FIFO: calf raise is on the leg press, at the agreed 120 kg', (await line('A1Leg Press Calf Raise')).includes('120 kg'), await line('A1Leg Press Calf Raise'));
 check('Lifts with nothing agreed are untouched (row stays 50 kg)', (await line('Iso-Lateral Row')).includes('50 kg'), await line('Iso-Lateral Row'));
 await click('Back');
 await click('Start Gym B'); await click('Start warm-up'); await click('Start lifting');
@@ -56,14 +56,14 @@ check('The row is labelled as weight on one side', /Iso-Lateral Row/i.test(t) &&
 for (let i = 0; i < 2; i++) await click('Next exercise');
 await click('Skip warm-up sets');   // warm-up sets come first since 15 Oct
 t = await text();
-check('On the day it says where the weight came from', /Leg Extension/i.test(t) && t.includes('65 kg') && t.includes('Agreed at your review on 13 Oct'), t.slice(0, 260));
+check('On the day it says where the weight came from', /Leg Extension/i.test(t) && t.includes('57.5 kg') && t.includes('Agreed at your review on 20 Oct'), t.slice(0, 260));
 for (let i = 0; i < 2; i++) await click('Next exercise');
 t = await text();
 check('Knee raises: log controlled hanging reps, top up, dead hang afterwards', /Hanging Knee Raise/i.test(t) && t.includes('top each set up to 10 with lying knee raises') && t.includes('after the last set'), t.slice(0, 300));
 
 // Once the lift has been done after the review, normal progression takes over
 await page.evaluate(() => window.__dev.update(s => { const id = s.activeSessionId; s.sessions = s.sessions.filter(x => x.id !== id); s.activeSessionId = null; }));
-await seed('oct20', 10, '2026-10-20', [['leg_extension', 1, 65, 12], ['leg_extension', 2, 65, 11], ['leg_extension', 3, 65, 10], ['leg_extension', 4, 65, 10]]);
+await seed('oct20', 10, '2026-10-21', [['leg_extension', 1, 65, 12], ['leg_extension', 2, 65, 11], ['leg_extension', 3, 65, 10], ['leg_extension', 4, 65, 10]]);
 await page.evaluate(() => window.__dev.update(s => { s.stints.push({ location: 'Port Hedland', start: '2026-11-23', end: '2026-12-06', gym: 'fifo' }); }));   // the second stint is added in the app, not the program file
 await on('2026-11-24');
 await click('Gym B');
