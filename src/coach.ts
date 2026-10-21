@@ -123,7 +123,7 @@ export function runDebrief(state: AppState, r: RunLog): Debrief | null {
   const hrs = repHr(r, act);
   const stopped = !!matched?.stoppedEarly;
   const full = hrs?.length ?? 0;
-  if (matched && full < done.length) notes.push({ tone: 'watch', text: `The watch shows ${full} full rep${full === 1 ? '' : 's'}${stopped ? ' and one cut short' : ''}, against ${done.length} ticked. Next time leave an unfinished rep unticked and choose "Couldn't finish all reps", so the speed rule knows.` });
+  if (matched && full < done.length) notes.push({ tone: 'watch', text: `The watch shows ${full} full rep${full === 1 ? '' : 's'}${stopped ? ' and one cut short' : ''}, against ${done.length} ticked. If a rep was cut short, leave it unticked next time and choose "Couldn't finish all reps" so the speed rule knows. If a lap press was just missed, ignore this.` });
   notes.push({ tone: done.length < work.length ? 'watch' : 'info', text: `${done.length} of ${work.length} reps done${speed !== undefined ? ` at ${speed} km/h` : ''}.${r.speedAfter !== undefined && r.speedBefore !== undefined ? ` Speed for next time: ${r.speedAfter} km/h${r.speedAfter === r.speedBefore ? ' (unchanged)' : ''}.` : ''}` });
   if (hrs && hrs.length >= 2) {
     const rise = Math.round(hrs.at(-1)! - hrs[0]);
