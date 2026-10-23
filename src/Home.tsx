@@ -108,6 +108,8 @@ function CheckinOffers({ state }: { state: AppState }) {
 
 export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: AppState; sync: SyncView; onOpen: (t: Target) => void; onStretch: () => void; onProgress: () => void }) {
   const [confirmWipe, setConfirmWipe] = useState(false);
+  // A rest day taken on purpose (23 Oct 2026): skip today's session, or push everything back a day.
+  const [resting, setResting] = useState<Slot | null>(null);
   const [kg, setKg] = useState('');
   const [protein, setProtein] = useState('');
   const p = state.program!;
@@ -314,6 +316,7 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
             {!s.done && changes && <div className="notice"><Icon name="info" size={16} /> Readiness {garminDay!.readiness}: {sug!.text}. You choose when you start.</div>}
             {!VIEW_ONLY && isGym(s.type) && !s.done && !running && <button className="btn primary" onClick={() => startGym(state, s.type, s)}>Start {NAMES[s.type]}</button>}
             {!VIEW_ONLY && !isGym(s.type) && !s.done && !running && p.running && <button className="btn primary" onClick={() => onOpen({ slotIdx: s.idx })}>Open {NAMES[s.type]}</button>}
+            {!VIEW_ONLY && !s.done && !running && <button className="btn ghost" onClick={() => setResting(s)}>Take a rest day instead</button>}
           </div>
         );
       })}
@@ -424,6 +427,17 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
             {practiceCount > 0 && <button className="btn ghost" onClick={() => setConfirmWipe(true)}>Delete practice data · {practiceCount} session{practiceCount > 1 ? 's' : ''}</button>}
           </div>
         </>
+      )}
+
+      {resting && (
+        <Sheet title="Rest day" onClose={() => setResting(null)}>
+          <p className="muted">One missed session costs nothing; training through real fatigue costs more. Choose what happens to today's {NAMES[resting.type]}.</p>
+          <button className="btn option" onClick={() => { update(s => { const x = s.schedule.find(y => y.idx === resting.idx); if (x) x.skipped = true; }); setResting(null); }}>
+            <b>Skip it</b><span className="small muted">Everything else stays where it is. Best when the days ahead are fixed, such as travel.</span></button>
+          <button className="btn option" onClick={() => { update(s => { s.schedule = shiftFrom(s.schedule, t, 1); }); setResting(null); }}>
+            <b>Move everything back a day</b><span className="small muted">Today's session becomes tomorrow's, and the rest follow.</span></button>
+          <button className="btn ghost" onClick={() => setResting(null)}>Cancel</button>
+        </Sheet>
       )}
 
       {confirmWipe && (

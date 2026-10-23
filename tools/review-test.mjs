@@ -102,6 +102,13 @@ check('"I finished this rep" ticks it and asks the usual question', /could you h
 await click('No');
 check('Saved as all reps done with the real answer, cool-down skipped', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'no' && r.segs.filter(x => x.work).every(x => x.done) && !r.segs.at(-1).done; }));
 
+// 23 Oct: a rest day taken on purpose skips today's session and moves nothing else
+await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; s.activeRunId = null; }));
+await on('2026-10-23');
+await click('Take a rest day instead');
+await click('Skip it');
+check('Rest day: today\'s Gym A is skipped, Saturday and Sunday stay put', await page.evaluate(() => { const sc = window.__dev.getState().schedule; const on = d => sc.filter(x => x.date === d && !x.skipped).map(x => x.type).join(); return sc.find(x => x.date === '2026-10-23').skipped === true && on('2026-10-24') === 'threshold' && on('2026-10-25') === 'gymD'; }));
+
 // 15 Oct: back-off sets never drop below what was already done for their reps
 const backoffs = await page.evaluate(async () => {
   const pl = await import('/src/plan.ts');
