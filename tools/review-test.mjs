@@ -139,7 +139,7 @@ const gymD = await page.evaluate(async () => {
   return [show('dips'), show('lying_leg_curl')];
 });
 check('Next Gym D: dips weighted, reverse pyramid from 10 kg', gymD[0] === 'Dips (weighted): 10x6 10x8 7.5x10', gymD[0]);
-check('Next Gym D at FIFO: lying leg curl in place of Nordics, 40 kg for 9, back-offs held at 35 and 30', gymD[1] === 'Lying Leg Curl: 40x9 35x10 30x12', gymD[1]);
+check('Next Gym D: lying leg curl (in place of Nordics at both gyms), 40 kg for 9, back-offs at 35 for 11 and 30 for 12', gymD[1] === 'Lying Leg Curl: 40x9 35x11 30x12', gymD[1]);
 
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} review checks passed` : `\n${results.filter(x => !x).length} of ${results.length} review checks FAILED`);

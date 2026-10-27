@@ -86,9 +86,9 @@ const seed = () => window.__dev.update(s => {
   check('Deadlift opens with estimated max (125 kg x 6 -> 150 kg)', dl.includes('150 kg') && dl.includes('weight × (1 + reps ÷ 30)'));
   await click('Leg Extension');
   check('Machine lift shows one line per gym as % change', (await page.evaluate(() => [...document.querySelectorAll('.chart-legend')].some(l => l.textContent.includes('FIFO') && l.textContent.includes('Adelaide')))));
-  await click('Pull-Up (Strict)'); await click('Hanging Leg Raise'); await click('Nordic Curl');
+  await click('Pull-Up (Strict)'); await click('Hanging Leg Raise');
   const more = await text();
-  check('Pull-ups show total reps; leg raises and Nordics show level', more.includes('Total reps per session') && more.includes('Level reached'));
+  check('Pull-ups show total reps; leg raises show level (Nordics replaced by leg curl, 28 Oct 2026)', more.includes('Total reps per session') && more.includes('Level reached'));
   await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.startsWith('Conventional Deadlift')).scrollIntoView()); await shot('lifts');
   // hover read-out
   const box = await page.evaluate(() => { const el = document.querySelector('.lift-body svg'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width * 0.9, y: r.y + r.height / 2, under: document.elementFromPoint(r.x + r.width * 0.9, r.y + r.height / 2)?.tagName }; });
