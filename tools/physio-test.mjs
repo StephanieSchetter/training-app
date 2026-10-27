@@ -34,6 +34,8 @@ async function fresh(date, spec, extra) {
   page.on('pageerror', e => console.log('PAGE ERROR', e.message));
   const url = `http://localhost:5173/?local&nocatchup&today=${date}`;
   await page.goto(url, { waitUntil: 'networkidle0' }); await wait(200);
+  // These checks test the physio rules themselves, so weights agreed at Brad's own reviews are left out.
+  await page.evaluate(() => window.__dev.update(s => { s.program.coachWeights = []; })); await wait(100);
   if (spec) { await page.evaluate(seed, spec); await wait(300); }
   if (extra) { await page.evaluate(extra); await wait(300); }
   if (spec || extra) { await wait(400); await page.goto(url, { waitUntil: 'networkidle0' }); await wait(300); }

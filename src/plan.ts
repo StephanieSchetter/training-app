@@ -197,10 +197,17 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
               if (!done.length) return t;
               const w = Math.min(...done.map(x => x.weight!));
               const reps = Math.min(...done.map(x => x.reps));
+              const rir = Math.min(...done.map(x => x.rir ?? 0));
               const want = scheme.reps[i];
               if (reps < want) return t;
-              const floor = reps >= want + 2 ? oneStepUp(w, equip, gym, ex) : roundNearest(w, equip, gym, ex);
-              return { ...t, weight: Math.min(top, Math.max(t.weight, floor)) };
+              // 27 Oct 2026: back-off sets progress like the top set. At the top of their range (2 over the
+              // target) or with 4+ in reserve, one step up; otherwise the same weight for one more rep.
+              const up = reps >= want + 2 || rir >= 4;
+              const same = roundNearest(w, equip, gym, ex);
+              const weight = Math.min(top, Math.max(t.weight, up ? oneStepUp(w, equip, gym, ex) : same));
+              const aim = weight === same ? Math.min(want + 2, reps + 1) : want;
+              repsLabel[i] = String(aim);
+              return { ...t, weight, reps: aim };
             });
           }
         }
@@ -299,7 +306,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         // 6/8/10 like weighted pull-ups (changed 18 Oct 2026 from weighted straight sets).
         const bw = past.filter(p => p.sets.every(s => !s.weight));
         const weighted = history.filter(h => h.weight > 0);
-        const start = program.coachWeights?.find(c => c.ex === ex);
+        const start = program.coachWeights?.find(c => c.ex === ex && session.date > c.from);
         if (weighted.length || start || bw.some(p => dipsGoWeighted(p.result.reps))) {
           equip = 'added';
           const sc = PULLUP_WEIGHTED.scheme;
@@ -341,7 +348,8 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
 
     // A weight agreed at a review stands in for the suggestion until the lift is next done. After that,
     // progression carries on from whatever was actually logged.
-    const agreed = program.coachWeights?.find(c => c.ex === ex && (!c.gym || c.gym === gym.id));
+    // Only for sessions after the review it was agreed at.
+    const agreed = program.coachWeights?.find(c => c.ex === ex && (!c.gym || c.gym === gym.id) && session.date > c.from);
     if (agreed && scheme.t !== 'dips' && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
       const w = roundNearest(agreed.kg, equip, gym, ex);
       targets = scheme.t === 'rpt' ? rptSets(w, targets.map(t => t.reps), targets[0].reps, ctx()) : targets.map(t => ({ ...t, weight: w }));

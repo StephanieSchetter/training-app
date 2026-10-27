@@ -37,7 +37,9 @@ const seed = (id, daysAgo, date, rows) => page.evaluate((id, daysAgo, date, rows
   const g = s.profiles.find(p => p.id === 'fifo'); g.machineSteps = { iso_row: 2.5, leg_extension: 2.5 }; g.smallestPlate = 1.25;
 }), id, daysAgo, date, rows);
 
-await on('2026-10-20');
+// The agreed weights are from the 20 Oct review, so check them at the next Port Hedland stint.
+await on('2026-11-24');
+await page.evaluate(() => window.__dev.update(s => { s.stints.push({ location: 'Port Hedland', start: '2026-11-23', end: '2026-12-06', gym: 'fifo' }); })); await on('2026-11-24');
 await seed('oct13', 20, '2026-10-13', [
   ['leg_extension', 1, 70, 12], ['leg_extension', 2, 70, 10], ['leg_extension', 3, 70, 8], ['leg_extension', 4, 70, 8],
   ['sl_calf_step_db', 1, 10, 12, 'L'], ['sl_calf_step_db', 1, 10, 12, 'R'], ['sl_calf_step_db', 2, 5, 12, 'L'], ['sl_calf_step_db', 2, 5, 12, 'R'], ['sl_calf_step_db', 3, 5, 12, 'L'], ['sl_calf_step_db', 3, 5, 12, 'R'],
@@ -120,7 +122,7 @@ const backoffs = await page.evaluate(async () => {
   const next = { id: 'x', slotIdx: null, type: 'gymC', date: '2026-10-22', gymId: 'fifo', week: 2, swaps: {}, warmup: [], startedAt: Date.now() };
   return pl.buildPlan(s, next).find(p => p.ex === 'lat_pulldown').targets.map(t => `${t.weight}x${t.reps}`).join(' ');
 });
-check('Lat pulldown next week: top 65 for 9, and the back-off sets stay at 60 and 55 (not 57.5 and 52.5)', backoffs === '65x9 60x10 55x12', backoffs);
+check('Lat pulldown next week: top 65 for 9; back-off sets stay at 60 and 55 and aim one rep more (27 Oct rule)', backoffs === '65x9 60x11 55x13', backoffs);
 
 // 18 Oct: weighted dips as a reverse pyramid from 10 kg; lying leg curl for Nordics at FIFO, carrying on from 40 x 8
 const gymD = await page.evaluate(async () => {

@@ -87,6 +87,27 @@ await click('Gym B');
 t = await text();
 check('A non-main lift (incline curl) shows one lighter set in the preview (7 kg: light dumbbells go in 1 kg steps)', /Incline Dumbbell Curl[\s\S]{0,40}Warm-up sets: 7 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
 
+// 27 Oct: in a pair, both exercises' warm-up sets come before the first working set
+await page.evaluate(() => window.__dev.update(s => {
+  s.activeSessionId = null;
+  const at = Date.now() - 2 * 86400000;
+  s.sessions.push({ id: 'a16', slotIdx: null, type: 'gymA', date: '2026-10-16', gymId: 'fifo', week: 1, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
+  [['lateral_raise', 9, 12], ['oh_triceps', 20, 12]].forEach(([exId, weight, reps], k) => [1, 2, 3].forEach(setNo => s.sets.push({ id: `${exId}${setNo}`, sessionId: 'a16', exId, plannedExId: exId, setNo, weight, reps, rir: 2, suggestedWeight: null, suggestedReps: reps, ts: at + k * 10 + setNo })));
+  s.profiles.find(p => p.id === 'fifo').machineSteps = { ...s.profiles.find(p => p.id === 'fifo').machineSteps, oh_triceps: 2.5 };
+}));
+await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-23', { waitUntil: 'networkidle0' }); await wait(250);
+await click('Start Gym A'); await click('Start warm-up'); await click('Start lifting');
+for (let i = 0; i < 5; i++) await click('Next exercise');
+const screen = async () => (await text()).replace(/\s+/g, ' ');
+let s1 = await screen();
+check('Pair: first the lateral raise warm-up', /Dumbbell Lateral Raise/i.test(s1) && /WARM-UP SET 1 OF 1/i.test(s1), s1.slice(0, 200));
+await click('Done · warm-up set');
+let s2 = await screen();
+check('Pair: then the triceps warm-up, before any working set', /WARM-UP SET 1 OF 1/i.test(s2) && /Overhead Cable Triceps/i.test(s2.split(/WARM-UP SETS · NOT COUNTED/i)[0]), s2.slice(0, 260));
+await click('Done · warm-up set');
+let s3 = await screen();
+check('Pair: then lateral raise set 1', /SET 1 OF 3/i.test(s3) && /Dumbbell Lateral Raise/i.test(s3.split(/SET 1 OF 3/i)[0]), s3.slice(0, 260));
+
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} ramp-up checks passed` : `\n${results.filter(x => !x).length} of ${results.length} ramp-up checks FAILED`);
 process.exit(results.every(Boolean) ? 0 : 1);

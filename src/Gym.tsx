@@ -293,7 +293,12 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
   const block = bl[Math.min(bi, bl.length - 1)];
   const steps = stepsFor(block, sets);
   const editing = editId ? steps.find(s => s.done?.id === editId) : undefined;
-  const current: Step | undefined = editing ?? steps.find(s => !s.done);
+  // In a pair (A1/A2), every exercise's warm-up sets come before the first working set of either (27 Oct 2026).
+  const [warmSkipped, setWarmSkipped] = useState<string[]>([]);
+  const needsWarm = (it: PlanItem) => it.usesWeight && it.ramp.length > 0 && !warmSkipped.includes(it.ex)
+    && !sets.some(s => s.exId === it.ex && !s.rampUp && !s.extra) && sets.filter(s => s.exId === it.ex && s.rampUp).length < it.ramp.length;
+  const warmFirst = !editing && block.length > 1 ? block.find(needsWarm) : undefined;
+  const current: Step | undefined = editing ?? (warmFirst ? steps.find(s => s.item === warmFirst && s.round === 0 && !s.done) : undefined) ?? steps.find(s => !s.done);
   const item = current?.item ?? block[0];
   const gym = state.profiles.find(p => p.id === session.gymId)!;
   const program = state.program!;
@@ -343,6 +348,7 @@ function Lifts({ state, session, sets, plan, title, closeBtn, onFinish }: {
           ? <SetupCard item={item} gymId={gym.id} gymName={gym.name} dock={timerNode} />
           : current
             ? <SetEditor key={(current.done?.id ?? '') + item.ex + current.round + (current.side ?? '')} state={state} session={session} sets={sets}
+                warmSkipped={warmSkipped.includes(item.ex)} onSkipWarm={() => setWarmSkipped(w => [...w, item.ex])}
                 step={current} block={block} gymId={gym.id} timer={timerNode}
                 onCancelEdit={() => setEditId(null)}
                 onLogged={rest => { setEditId(null); if (rest) setTimer({ end: Date.now() + rest * 1000, total: rest }); }} />
@@ -503,8 +509,9 @@ function SetupCard({ item, gymId, gymName, dock }: { item: PlanItem; gymId: stri
   );
 }
 
-function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, onCancelEdit }: {
+function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, onCancelEdit, warmSkipped, onSkipWarm }: {
   state: AppState; session: SessionLog; sets: SetLog[]; step: Step; block: PlanItem[]; gymId: string; timer: ReactNode;
+  warmSkipped: boolean; onSkipWarm: () => void;
   onLogged: (restSeconds: number | null) => void; onCancelEdit: () => void;
 }) {
   const { item, round, side, done } = step;
@@ -530,7 +537,6 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const [assist, setAssist] = useState<string>(done?.assist ?? item.assist ?? 'band');
   // What set 1 would be pre-filled with, to come back to after the warm-up sets.
   const working = useRef({ weight, reps });
-  const [skipWarm, setSkipWarm] = useState(false);
 
   const bump = (dir: number) => {
     if (item.equip === 'kettlebell' && gym.kettlebells.length) {
@@ -577,7 +583,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   // and the main Done button logs it as a warm-up that never counts. Skip goes straight to set 1.
   const rampDone = sets.filter(s => s.exId === item.ex && s.rampUp).length;
   const showRamp = canRamp && (item.isMain || item.ramp.length > 0);
-  const pending = showRamp && !skipWarm && rampDone < item.ramp.length ? item.ramp[rampDone] : null;
+  const pending = showRamp && !warmSkipped && rampDone < item.ramp.length ? item.ramp[rampDone] : null;
   const wasPending = useRef(false);
   useEffect(() => {
     if (pending) { setWeight(pending.weight); setReps(pending.reps); }
@@ -602,7 +608,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
                   </div>
                 ))}
               </div>
-              {pending && <button className="btn ghost" onClick={() => setSkipWarm(true)}>Skip warm-up sets</button>}
+              {pending && <button className="btn ghost" onClick={onSkipWarm}>Skip warm-up sets</button>}
               <div className="muted small">{item.ramp.length > 1 ? 'Easy and crisp, about a minute between them. Then rest 2–3 minutes before the first working set below.' : 'Light and easy, just to groove the movement. Then straight into the first working set below.'}</div>
             </>
           ) : (
