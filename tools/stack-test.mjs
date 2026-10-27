@@ -56,6 +56,13 @@ await shot('set-screen');
 // Log a top set of 60 x 10, then check next week's suggestion crosses the change by one pin
 for (let i = 0; i < 1; i++) await click('More Weight');
 check('Back at 60', Number(await weight()) === 60);
+// 28 Oct 2026: typing a decimal weight (22.5, or 22,5) keeps the point instead of collapsing to 22
+for (const typed of ['22.5', '22,5']) {
+  await page.evaluate(() => { const el = document.querySelector('.stepper input'); el.focus(); el.select(); });
+  await page.keyboard.press('Backspace');
+  await page.type('.stepper input', typed); await wait(150);
+  check(`Typing ${typed} in the weight box gives 22.5`, Number(String(await weight()).replace(',', '.')) === 22.5, await weight());
+}
 
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-13', { waitUntil: 'networkidle0' }); await wait(250);
 await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; })); await wait(200);   // step out of the open session

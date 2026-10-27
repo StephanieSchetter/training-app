@@ -63,6 +63,27 @@ export function AppBar({ title, sub, left, right }: { title: string; sub?: React
   );
 }
 
+/**
+ * A typed number that keeps what is being typed (28 Oct 2026): "22." or "22,5" part-way through no longer
+ * collapses to 22, so weights like 22.5 can be typed. A comma counts as a decimal point.
+ */
+function NumberInput({ value, onType }: { value: number | null; onType: (v: number | null) => void }) {
+  const [text, setText] = useState(value == null ? '' : String(value));
+  useEffect(() => {
+    const typed = text.trim() === '' ? null : Number(text.replace(',', '.'));
+    if (typed !== value) setText(value == null ? '' : String(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <input inputMode="decimal" value={text} placeholder="—" onChange={e => {
+      const t = e.target.value.replace(/[^0-9.,]/g, '');
+      setText(t);
+      if (t === '') return onType(null);
+      const n = Number(t.replace(',', '.'));
+      if (Number.isFinite(n)) onType(n);
+    }} />
+  );
+}
+
 export function Stepper({ label, unit, value, onMinus, onPlus, onType }: {
   label: string; unit: string; value: number | string | null; onMinus: () => void; onPlus: () => void; onType?: (v: number | null) => void;
 }) {
@@ -73,7 +94,7 @@ export function Stepper({ label, unit, value, onMinus, onPlus, onType }: {
         <button aria-label={`Less ${label}`} onClick={onMinus}><Icon name="minus" size={28} /></button>
         <label>
           {onType
-            ? <input inputMode="decimal" value={value ?? ''} placeholder="—" onChange={e => onType(e.target.value === '' ? null : Number(e.target.value))} />
+            ? <NumberInput value={typeof value === 'number' ? value : null} onType={onType} />
             : <div className="num">{value}</div>}
           <span>{unit}</span>
         </label>
