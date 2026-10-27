@@ -47,10 +47,13 @@ export function App() {
   const t = today();
   const garminDays = Object.keys(state.garminDays).length;
   const ready = sync.auth === 'in' && !!state.program;
+  // The daily checks wait for the first download, so an out-of-date copy on this phone is never shifted
+  // and uploaded over newer data (27 Oct 2026).
+  const checksReady = ready && sync.settled;
 
   // Once a day, and again when new Garmin data arrives: move missed sessions and check the resting-HR rule.
   const resets = state.program?.running?.resets?.length ?? 0;
-  useEffect(() => { if (ready) dailyChecks(); }, [ready, t, garminDays, resets]);
+  useEffect(() => { if (checksReady) dailyChecks(); }, [checksReady, t, garminDays, resets]);
 
   if (sync.auth === 'loading') return <div className="screen" />;
   if (sync.auth === 'out') return <Login />;

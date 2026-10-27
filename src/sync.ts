@@ -18,20 +18,23 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 43;
+export const APP_VERSION = 44;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
   /** When the oldest waiting item was first queued. */
   oldest: number | null;
   error: string | null;
+  /** The first sync since opening has been tried (or can't be: offline, signed out). Until then this
+   *  phone's copy may be out of date, so nothing should be worked out from it and uploaded (27 Oct 2026). */
+  settled: boolean;
 }
 
 const DISK_KEY = 'training-app-sync-v1';
 const DAY = 24 * 3600 * 1000;
 let disk: SyncDisk = { pushed: {}, since: {}, lastPull: null };
 let session: Session | null = null;
-let view: SyncView = { auth: LOCAL_ONLY ? 'in' : 'loading', pending: 0, oldest: null, error: null };
+let view: SyncView = { auth: LOCAL_ONLY ? 'in' : 'loading', pending: 0, oldest: null, error: null, settled: LOCAL_ONLY };
 const listeners = new Set<() => void>();
 let busy = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -221,7 +224,7 @@ async function push(p: Pending) {
 
 export async function syncNow() {
   if (LOCAL_ONLY || busy || !session) { refreshCount(); return; }
-  if (!navigator.onLine) { refreshCount(); return; }
+  if (!navigator.onLine) { refreshCount(); if (!view.settled) setView({ settled: true }); return; }
   busy = true;
   try {
     await pull();
@@ -234,6 +237,7 @@ export async function syncNow() {
   } finally {
     busy = false;
     refreshCount();
+    if (!view.settled) setView({ settled: true });
   }
 }
 
