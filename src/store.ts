@@ -15,8 +15,10 @@ export type Scheme =
   | { t: 'nordic'; sets: number; range: [number, number] }
   /** Bodyweight until every set hits the top of the range and felt easy (RIR 3+), then loaded in 2.5 kg steps. */
   | { t: 'bwload'; sets: number; range: [number, number] }
-  /** Progresses by stage (hand position), not weight. */
-  | { t: 'stage'; sets: number; range: [number, number] };
+  /** Progresses by stage (hand position), not weight. stages: this exercise's own stages (the lateral bend
+   *  uses the program's lateralBendStages), each with its own set count if given. hold: a hold until
+   *  fatigue follows the reps, and its seconds are logged (side plank, 27 Oct 2026). */
+  | { t: 'stage'; sets: number; range: [number, number]; stages?: { name: string; sets?: number }[]; hold?: boolean };
 
 /** In a swap, "leave this exercise out" in place of a replacement. */
 export const DROP = '__drop';
@@ -92,6 +94,8 @@ export interface SetLog {
   setNo: number; side?: 'L' | 'R';
   weight: number | null; reps: number; rir: number | null;
   rampUp?: boolean; extra?: boolean; controlled?: boolean; assist?: string; level?: number;
+  /** Seconds held at the end of the set (side plank). */
+  holdSec?: number;
   suggestedWeight: number | null; suggestedReps: number | null;
   ts: number;
 }

@@ -68,7 +68,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   await a.click('Start warm-up'); await a.click('Start lifting');
   for (let i = 0; i < 2; i++) await a.click('Done');
   await a.click('Finish');
-  check('Thursday: the primer is not counted in the session totals', /EXERCISES\s*0 of 6/.test(await a.text()) && /SETS\s*0/.test(await a.text()), (await a.text()).slice(0, 120));
+  check('Thursday: the primer is not counted in the session totals', /EXERCISES\s*0 of 7/.test(await a.text()) && /SETS\s*0/.test(await a.text()), (await a.text()).slice(0, 120));
   await a.close();
 }
 
@@ -147,7 +147,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const s = (await d.text()).split("TODAY'S EXERCISES")[1];
   const od = ['Single-Leg Romanian Deadlift', 'Dips', 'Lying Leg Curl',   // at FIFO Nordics swap to a lying leg curl (18 Oct)
     'A1', 'Face Pull', 'A2', 'Hammer Curl', 'Single-Leg Calf Raise', 'B1', '45° Back Extension', 'B2', '45° Lateral Bend'];
-  check('Sunday: order and pairs, side plank removed', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && !s.includes('Side Plank'), s);
+  check('Sunday: order and pairs; the side plank (back by Dan, 27 Oct 2026) comes last', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && s.lastIndexOf('Side Plank') > s.indexOf(od.at(-1)), s);
   await d.close();
 }
 
@@ -164,6 +164,38 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const up = await fresh('2026-10-17', fri(be([2, 2, 2], 2.5)));
   check('Back extension weighted: all sets at 12 -> +2.5 kg to 5', /45° Back Extension \(weighted\)\s*3 × 10–12\s*5 kg/.test(await up.plan(18, 'Gym D')));
   await up.close();
+}
+
+// 5b. Side plank with hip dips (Dan, 27 Oct 2026): 2 sets per side, then 3, then the top-leg lift; hold time logged
+{
+  const sp = (sets, reps, level, controlled = true) => Array.from({ length: sets }, (_, i) => i + 1).flatMap(n => ['L', 'R'].map(side => ['side_plank', n, null, typeof reps === 'function' ? reps(n, side) : reps, { side, controlled, level, holdSec: 30 }]));
+  const fri = sets => [{ id: 'a1', type: 'gymA', date: '2026-10-16', week: 1, daysAgo: 2, sets }];
+  const start = await fresh('2026-10-17');
+  const t0 = await start.plan(18, 'Gym D');
+  check('Side plank: last in Gym D, stage 1 = 2 sets of 10–15 plus a hold, each side', /Side Plank with Hip Dips · Stage 1: Hip dips, 2 sets\s*2 × 10–15 \+ hold each side/i.test(t0), t0.slice(-200));
+  await start.close();
+  const two = await fresh('2026-10-17', fri(sp(2, 15, 1)));
+  check('Side plank: 15 on both sets, both sides, controlled -> stage 2, 3 sets', /Stage 2: Hip dips, 3 sets\s*3 × 10–15 \+ hold each side/i.test(await two.plan(18, 'Gym D')));
+  await two.close();
+  const short = await fresh('2026-10-17', fri(sp(2, (n, side) => (n === 2 && side === 'L' ? 13 : 15), 1)));
+  check('Side plank: one side of one set at 13 -> stays at stage 1', /Stage 1: Hip dips, 2 sets/i.test(await short.plan(18, 'Gym D')));
+  await short.close();
+  const three = await fresh('2026-10-17', fri(sp(3, 15, 2)));
+  check('Side plank: 3 × 15 at stage 2 -> stage 3, the top-leg lift', /Stage 3: Hip dips with top-leg lift\s*3 × 10–15 \+ hold each side/i.test(await three.plan(18, 'Gym D')));
+  await three.close();
+  // Logging a set: the hold box starts at last time's hold on that side, and the seconds are saved
+  const log = await fresh('2026-10-18', fri(sp(2, 12, 1)));   // Sunday: Gym D
+  await log.page.evaluate(() => window.__dev.update(s => { s.sets.find(x => x.exId === 'side_plank' && x.side === 'L' && x.setNo === 1).holdSec = 45; }));
+  await log.click('Start Gym'); await log.click('Start warm-up'); await log.click('Start lifting');
+  for (let i = 0; i < 15 && !(await log.text()).includes('Hold at the end'); i++) await log.click('Next exercise');
+  const st = await log.text();
+  const held = await log.page.evaluate(() => [...document.querySelectorAll('.field')].find(f => f.textContent.includes('Hold at the end'))?.querySelector('input')?.value);
+  check('Side plank set screen: hold box pre-filled with last time (45 s), stage choices shown', held === '45' && st.includes('2: Hip dips, 3 sets'), `${held} ${st.slice(0, 200)}`);
+  await log.click('More Hold at the end'); await log.click('More Hold at the end');
+  await log.click('Done');
+  const saved = await log.page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'side_plank' && s.sessionId !== 'a1').map(s => `${s.side}${s.setNo}:${s.reps}+${s.holdSec}s L${s.level}`).join());
+  check('Side plank: the set is saved with the seconds held', saved === 'L1:10+55s L1', saved);
+  await log.close();
 }
 
 // 5. Lateral bend: up a stage only at 12 on every set, both sides, all controlled

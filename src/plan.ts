@@ -6,7 +6,7 @@ import {
   PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
 } from './engine/progression';
 import { DROP } from './store';
-import type { AppState, Exercise, ProgramItem, Scheme, SessionLog, SetLog } from './store';
+import type { AppState, Exercise, Program, ProgramItem, Scheme, SessionLog, SetLog } from './store';
 
 export interface PlanItem {
   plannedEx: string;
@@ -42,6 +42,12 @@ export interface PlanItem {
 }
 
 export const LATERAL_BEND_STAGES = ['Hands by sides', 'Hands crossed over chest', 'Hands above head'];
+
+/** Stage names for a stage exercise: its own if the program gives them, otherwise the lateral bend's. */
+export function stageNames(program: Program, scheme: Scheme): string[] {
+  if (scheme.t === 'stage' && scheme.stages?.length) return scheme.stages.map(s => s.name);
+  return program.lateralBendStages ?? LATERAL_BEND_STAGES;
+}
 
 /** The scheme an exercise uses in a given week (the graded deadlift return changes by week). */
 function schemeIn(item: ProgramItem, week: number): Scheme {
@@ -236,8 +242,9 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         break;
       }
       case 'stage': {
-        const names = program.lateralBendStages ?? LATERAL_BEND_STAGES;
         const sc = scheme;
+        const names = stageNames(program, sc);
+        const setsAt = (n: number) => sc.stages?.[n - 1]?.sets ?? sc.sets;
         let stage = 1;
         for (const p of past) {
           if (easedOff(state, p.session)) continue; // an eased-off session never counts towards moving up
@@ -245,12 +252,12 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           // Brad can move himself up a stage on the day (27 Oct 2026); the logged stage then stands.
           if (at > stage) stage = Math.min(at, names.length);
           const rows = p.sets.filter(s => !s.rampUp && !s.extra).map(s => ({ setNo: s.setNo, side: s.side, reps: s.reps, controlled: !!s.controlled }));
-          if (at === stage && stage < names.length && lateralBendStageUp(rows, sc.sets, sc.range[1])) stage++;
+          if (at === stage && stage < names.length && lateralBendStageUp(rows, setsAt(at), sc.range[1])) stage++;
         }
         level = flare ? Math.max(1, stage - 1) : stage;
         title = `${info.name} · Stage ${level}: ${names[level - 1]}`;
-        targets = Array.from({ length: sc.sets }, () => ({ weight: null, reps: sc.range[0] }));
-        repsLabel = targets.map(() => range(sc.range));
+        targets = Array.from({ length: setsAt(level) }, () => ({ weight: null, reps: sc.range[0] }));
+        repsLabel = targets.map(() => range(sc.range) + (sc.hold ? ' + hold' : ''));
         reason = flare && stage > 1 ? 'Back-flare week: one stage easier' : '';
         break;
       }

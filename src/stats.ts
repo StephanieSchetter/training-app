@@ -2,6 +2,7 @@
 import { easyRows, EasyRow, runActivity } from './coach';
 import { easyPaceAdvice } from './engine/coach';
 import { addDays } from './engine/schedule';
+import { stageNames } from './plan';
 import { AppState, currentSpeeds, RunLog } from './store';
 
 export interface Point { x: string; y: number; note?: string; /** Start a new line segment here. */ gap?: boolean }
@@ -46,13 +47,14 @@ const ASSIST = ['band', 'partial', 'full'];
 export function liftChart(state: AppState, exId: string): LiftChart {
   const ex = state.program!.exercises[exId];
   const rows = topSets(state, exId);
-  const scheme = Object.values(state.program!.sessions).flatMap(s => s.items).find(i => i.ex === exId)?.scheme.t;
+  const schemeOf = Object.values(state.program!.sessions).flatMap(s => s.items).find(i => i.ex === exId)?.scheme;
+  const scheme = schemeOf?.t;
 
   if (scheme === 'legraise') {
     return { kind: 'level', unit: 'level', levels: state.program!.legRaiseLevels.map(l => `Level ${l.level}`), series: [{ name: 'Level', points: rows.map(r => ({ x: r.date, y: r.level ?? 1 })) }] };
   }
-  if (scheme === 'stage') {
-    const names = state.program!.lateralBendStages ?? ['Hands by sides', 'Hands crossed over chest', 'Hands above head'];
+  if (schemeOf?.t === 'stage') {
+    const names = stageNames(state.program!, schemeOf);
     return { kind: 'level', unit: 'level', levels: names.map((_, i) => `Stage ${i + 1}`), series: [{ name: 'Stage', points: rows.map(r => ({ x: r.date, y: r.level ?? 1 })) }] };
   }
   if (scheme === 'nordic') {

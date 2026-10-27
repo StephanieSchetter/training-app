@@ -4,7 +4,7 @@ import { nudge, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
-import { autoSwaps, blocks, buildPlan, LATERAL_BEND_STAGES, lastSet, leftOut, PlanItem, Step, stepsFor } from './plan';
+import { autoSwaps, blocks, buildPlan, lastSet, leftOut, PlanItem, stageNames, Step, stepsFor } from './plan';
 import { AppState, DROP, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
 import { AppBar, clock, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
@@ -12,7 +12,7 @@ type Phase = 'start' | 'warmup' | 'lifts' | 'finish';
 const RIRS = ['0', '1', '2', '3', '4+'];
 const fmtKg = (w: number | null) => (w === null ? '—' : `${w} kg`);
 const sideName = (s?: 'L' | 'R') => (s === 'L' ? 'Left' : s === 'R' ? 'Right' : '');
-const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
+const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.holdSec != null ? ` + ${s.holdSec} s hold` : ''}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
 export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
 
 export function useWakeLock() {
@@ -537,6 +537,9 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const [assist, setAssist] = useState<string>(done?.assist ?? item.assist ?? 'band');
   // Lateral bend: the stage can be changed on the day (27 Oct 2026); it is saved on the set.
   const [stageNow, setStageNow] = useState<number | undefined>(done?.level ?? item.level);
+  // Side plank: seconds held after the reps, pre-filled with last time's hold on this side.
+  const holds = item.scheme.t === 'stage' && !!item.scheme.hold;
+  const [holdSec, setHoldSec] = useState<number | null>(done ? done.holdSec ?? null : holds ? last?.holdSec ?? 30 : null);
   // What set 1 would be pre-filled with, to come back to after the warm-up sets.
   const working = useRef({ weight, reps });
 
@@ -563,6 +566,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       controlled: item.scheme.t === 'legraise' || item.scheme.t === 'stage' ? controlled : undefined,
       assist: item.scheme.t === 'nordic' ? assist : undefined,
       level: item.scheme.t === 'stage' ? stageNow : item.level,
+      holdSec: holds && !rampUp && holdSec !== null ? holdSec : undefined,
       suggestedWeight: rampUp && pending ? pending.weight : target.weight, suggestedReps: rampUp && pending ? pending.reps : target.reps, ts: done?.ts ?? Date.now(),
     };
     write('sets', id, s => {
@@ -652,16 +656,19 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
         <Segmented options={RIRS.map((label, value) => ({ value, label }))} value={rir} onChange={setRir} />
       </div>}
 
+      {holds && !pending && (
+        <Stepper label="Hold at the end" unit="seconds" value={holdSec} onMinus={() => setHoldSec(h => Math.max(0, (h ?? 0) - 5))} onPlus={() => setHoldSec(h => (h ?? 0) + 5)} onType={setHoldSec} />
+      )}
       {item.scheme.t === 'stage' && !pending && (
         <div className="field">
           <div className="field-label">Stage</div>
-          <Segmented options={(state.program!.lateralBendStages ?? LATERAL_BEND_STAGES).map((name, i) => ({ value: i + 1, label: `${i + 1}: ${name.replace('Hands ', '')}` }))} value={stageNow ?? 1} onChange={v => v && setStageNow(v)} />
+          <Segmented options={stageNames(state.program!, item.scheme).map((name, i) => ({ value: i + 1, label: `${i + 1}: ${name.replace('Hands ', '')}` }))} value={stageNow ?? 1} onChange={v => v && setStageNow(v)} />
         </div>
       )}
       {item.scheme.t === 'stage' && (
         <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
           <span className="circle">{controlled && <Icon name="check" size={18} />}</span>
-          <span className="check-body"><b>Controlled</b><span className="small muted">Tick it whenever the set was controlled, whatever the reps. The stage goes up once every set, both sides, is 12 reps and ticked.</span></span>
+          <span className="check-body"><b>Controlled</b><span className="small muted">Tick it whenever the set was controlled, whatever the reps. The stage goes up once every set, both sides, is {item.scheme.range[1]} reps and ticked.</span></span>
         </button>
       )}
       {item.scheme.t === 'legraise' && (
