@@ -141,6 +141,19 @@ const gymD = await page.evaluate(async () => {
 check('Next Gym D: dips weighted, reverse pyramid from 10 kg', gymD[0] === 'Dips (weighted): 10x6 10x8 7.5x10', gymD[0]);
 check('Next Gym D: lying leg curl (in place of Nordics at both gyms), 40 kg for 9, back-offs at 35 for 11 and 30 for 12', gymD[1] === 'Lying Leg Curl: 40x9 35x11 30x12', gymD[1]);
 
+// 28 Oct: Port Hedland 18 x 8, 16 x 10, 14 x 12 on single-leg RDL; in Adelaide (2.5 kg dumbbell steps) 16 and 14
+// both round to 15. Back-off sets must still go down, and only an unchanged weight aims for one more rep.
+const rdl = await page.evaluate(async () => {
+  const pl = await import('/src/plan.ts');
+  const s = structuredClone(window.__dev.getState());
+  const at = Date.now() - 86400000;
+  s.sessions.push({ id: 'r18', slotIdx: null, type: 'gymD', date: '2026-10-18', gymId: 'fifo', week: 1, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 });
+  [[1, 18, 8], [2, 16, 10], [3, 14, 12]].forEach(([setNo, weight, reps]) => ['L', 'R'].forEach(side => s.sets.push({ id: `rd${setNo}${side}`, sessionId: 'r18', exId: 'sl_rdl', plannedExId: 'sl_rdl', setNo, side, weight, reps, rir: 3, suggestedWeight: null, suggestedReps: reps, ts: at + setNo })));
+  const plan = pl.buildPlan(s, { id: 'x', slotIdx: null, type: 'gymD', date: '2026-10-28', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: Date.now() });
+  return plan.find(p => p.ex === 'sl_rdl').targets.map(t => `${t.weight}x${t.reps}`).join(' ');
+});
+check('Single-leg RDL moving to Adelaide: 17.5 for 9, then 15 for 10 and 12.5 for 12 (each set lighter, own targets)', rdl === '17.5x9 15x10 12.5x12', rdl);
+
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} review checks passed` : `\n${results.filter(x => !x).length} of ${results.length} review checks FAILED`);
 process.exit(results.every(Boolean) ? 0 : 1);

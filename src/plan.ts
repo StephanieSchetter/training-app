@@ -1,6 +1,6 @@
 // Turns the program + logged history into what the gym screens show for one session.
 import type { Equip, GymProfile } from './engine/weights';
-import { gridStep, oneStepUp, roundNearest } from './engine/weights';
+import { gridStep, nudge, oneStepUp, roundNearest } from './engine/weights';
 import {
   backExtensionGoWeighted, deloadSetCount, rampSets, dipsGoWeighted, lateralBendStageUp, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
   PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
@@ -211,10 +211,22 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
               const up = reps >= want + 2 || rir >= 4;
               const same = roundNearest(w, equip, gym, ex);
               const weight = Math.min(top, Math.max(t.weight, up ? oneStepUp(w, equip, gym, ex) : same));
-              const aim = weight === same ? Math.min(want + 2, reps + 1) : want;
+              // One more rep only at exactly the weight done last time. A different weight (e.g. 16 kg at Port
+              // Hedland rounding to 15 in Adelaide) aims for the set's own target (28 Oct 2026).
+              const aim = weight === w ? Math.min(want + 2, reps + 1) : want;
               repsLabel[i] = String(aim);
               return { ...t, weight, reps: aim };
             });
+            // Each back-off set stays lighter than the set before it: when rounding to this gym's steps makes
+            // two sets the same (16 and 14 both becoming 15), the later one goes one step down (28 Oct 2026).
+            for (let i = 1; i < targets.length; i++) {
+              const prevW = targets[i - 1].weight, t = targets[i];
+              if (prevW == null || t.weight == null || t.weight < prevW) continue;
+              const down = nudge(prevW, -1, equip, gym, ex);
+              if (down >= prevW || down <= 0) continue;
+              targets[i] = { ...t, weight: down, reps: scheme.reps[i] };
+              repsLabel[i] = String(scheme.reps[i]);
+            }
           }
         }
         break;
