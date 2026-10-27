@@ -4,7 +4,7 @@ import { nudge, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
-import { autoSwaps, blocks, buildPlan, lastSet, leftOut, PlanItem, Step, stepsFor } from './plan';
+import { autoSwaps, blocks, buildPlan, LATERAL_BEND_STAGES, lastSet, leftOut, PlanItem, Step, stepsFor } from './plan';
 import { AppState, DROP, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
 import { AppBar, clock, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
@@ -535,6 +535,8 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const [rir, setRir] = useState<number | null>(done ? done.rir : null);
   const [controlled, setControlled] = useState(done ? !!done.controlled : false);
   const [assist, setAssist] = useState<string>(done?.assist ?? item.assist ?? 'band');
+  // Lateral bend: the stage can be changed on the day (27 Oct 2026); it is saved on the set.
+  const [stageNow, setStageNow] = useState<number | undefined>(done?.level ?? item.level);
   // What set 1 would be pre-filled with, to come back to after the warm-up sets.
   const working = useRef({ weight, reps });
 
@@ -560,7 +562,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       rampUp: rampUp || undefined,
       controlled: item.scheme.t === 'legraise' || item.scheme.t === 'stage' ? controlled : undefined,
       assist: item.scheme.t === 'nordic' ? assist : undefined,
-      level: item.level,
+      level: item.scheme.t === 'stage' ? stageNow : item.level,
       suggestedWeight: rampUp && pending ? pending.weight : target.weight, suggestedReps: rampUp && pending ? pending.reps : target.reps, ts: done?.ts ?? Date.now(),
     };
     write('sets', id, s => {
@@ -650,6 +652,12 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
         <Segmented options={RIRS.map((label, value) => ({ value, label }))} value={rir} onChange={setRir} />
       </div>}
 
+      {item.scheme.t === 'stage' && !pending && (
+        <div className="field">
+          <div className="field-label">Stage</div>
+          <Segmented options={(state.program!.lateralBendStages ?? LATERAL_BEND_STAGES).map((name, i) => ({ value: i + 1, label: `${i + 1}: ${name.replace('Hands ', '')}` }))} value={stageNow ?? 1} onChange={v => v && setStageNow(v)} />
+        </div>
+      )}
       {item.scheme.t === 'stage' && (
         <button className={'check' + (controlled ? ' on' : '')} aria-pressed={controlled} onClick={() => setControlled(c => !c)}>
           <span className="circle">{controlled && <Icon name="check" size={18} />}</span>

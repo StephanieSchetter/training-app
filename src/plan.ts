@@ -242,6 +242,8 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         for (const p of past) {
           if (easedOff(state, p.session)) continue; // an eased-off session never counts towards moving up
           const at: number = p.sets[0]?.level ?? stage;
+          // Brad can move himself up a stage on the day (27 Oct 2026); the logged stage then stands.
+          if (at > stage) stage = Math.min(at, names.length);
           const rows = p.sets.filter(s => !s.rampUp && !s.extra).map(s => ({ setNo: s.setNo, side: s.side, reps: s.reps, controlled: !!s.controlled }));
           if (at === stage && stage < names.length && lateralBendStageUp(rows, sc.sets, sc.range[1])) stage++;
         }
