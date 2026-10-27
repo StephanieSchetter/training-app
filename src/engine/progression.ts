@@ -1,5 +1,5 @@
 // Gym progression rules (spec section 6). Suggestions go purely by reps.
-import { Equip, GymProfile, gridStep, oneStepUp, roundDown, roundNearest } from './weights';
+import { Equip, GymProfile, gridStep, nudge, oneStepUp, roundDown, roundNearest } from './weights';
 
 export interface LiftCtx {
   exId: string;
@@ -50,10 +50,19 @@ function findLoad(history: PastResult[], ctx: LiftCtx, reps: number[]): Suggesti
 
 /** Back sets always come from the top set: set 2 = top x 0.9, set 3 = top x 0.81, each rounded. */
 export function rptSets(top: number, scheme: number[], topReps: number, ctx: LiftCtx): SetTarget[] {
-  return scheme.map((r, i) => ({
-    weight: i === 0 ? top : roundNearest(top * Math.pow(0.9, i), ctx.equip, ctx.gym, ctx.exId),
-    reps: i === 0 ? topReps : r,
-  }));
+  const out: SetTarget[] = [];
+  scheme.forEach((r, i) => {
+    let weight = i === 0 ? top : roundNearest(top * Math.pow(0.9, i), ctx.equip, ctx.gym, ctx.exId);
+    // Each set lighter than the one before (28 Oct 2026): at light loads a 10% drop can round back up to
+    // the same weight (10 kg dips: 9 rounds to 10), so take one step down instead.
+    const prev = out[i - 1]?.weight;
+    if (prev != null && weight >= prev) {
+      const down = nudge(prev, -1, ctx.equip, ctx.gym, ctx.exId);
+      if (down < prev && down > 0) weight = down;
+    }
+    out.push({ weight, reps: i === 0 ? topReps : r });
+  });
+  return out;
 }
 
 const BAR_KG = 20;

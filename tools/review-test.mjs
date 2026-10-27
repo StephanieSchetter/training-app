@@ -138,7 +138,7 @@ const gymD = await page.evaluate(async () => {
   const show = id => { const p = plan.find(q => q.ex === id); return p ? `${p.title}: ${p.targets.map(t => `${t.weight}x${t.reps}`).join(' ')}` : 'missing'; };
   return [show('dips'), show('lying_leg_curl')];
 });
-check('Next Gym D: dips weighted, reverse pyramid from 10 kg', gymD[0] === 'Dips (weighted): 10x6 10x8 7.5x10', gymD[0]);
+check('Next Gym D: dips weighted, reverse pyramid from 10 kg, each set lighter (28 Oct)', gymD[0] === 'Dips (weighted): 10x6 7.5x8 5x10', gymD[0]);
 check('Next Gym D: lying leg curl (in place of Nordics at both gyms), 40 kg for 9, back-offs at 35 for 11 and 30 for 12', gymD[1] === 'Lying Leg Curl: 40x9 35x11 30x12', gymD[1]);
 
 // 28 Oct: Port Hedland 18 x 8, 16 x 10, 14 x 12 on single-leg RDL; in Adelaide (2.5 kg dumbbell steps) 16 and 14
