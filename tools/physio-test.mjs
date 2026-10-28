@@ -190,11 +190,11 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   for (let i = 0; i < 15 && !(await log.text()).includes('Hold at the end'); i++) await log.click('Next exercise');
   const st = await log.text();
   const held = await log.page.evaluate(() => [...document.querySelectorAll('.field')].find(f => f.textContent.includes('Hold at the end'))?.querySelector('input')?.value);
-  check('Side plank set screen: hold box pre-filled with last time (45 s), stage choices shown', held === '45' && st.includes('2: Hip dips, 3 sets'), `${held} ${st.slice(0, 200)}`);
+  check('Side plank set screen: aims one more dip (13) and 5 s more hold (50 s) than last time, stage choices shown', held === '50' && st.includes('Aim today: 13 dips, then hold 50 s') && st.includes('2: Hip dips, 3 sets'), `${held} ${st.slice(0, 200)}`);
   await log.click('More Hold at the end'); await log.click('More Hold at the end');
   await log.click('Done');
   const saved = await log.page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'side_plank' && s.sessionId !== 'a1').map(s => `${s.side}${s.setNo}:${s.reps}+${s.holdSec}s L${s.level}`).join());
-  check('Side plank: the set is saved with the seconds held', saved === 'L1:10+55s L1', saved);
+  check('Side plank: the set is saved with the seconds held', saved === 'L1:13+60s L1', saved);
   await log.close();
 }
 

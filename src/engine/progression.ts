@@ -52,7 +52,11 @@ function findLoad(history: PastResult[], ctx: LiftCtx, reps: number[]): Suggesti
 export function rptSets(top: number, scheme: number[], topReps: number, ctx: LiftCtx): SetTarget[] {
   const out: SetTarget[] = [];
   scheme.forEach((r, i) => {
-    let weight = i === 0 ? top : roundNearest(top * Math.pow(0.9, i), ctx.equip, ctx.gym, ctx.exId);
+    // Weighted dips and pull-ups (28 Oct 2026): the load is body weight plus the plate, so 10% of the plate
+    // means almost nothing; each set drops 5 kg instead (about 5% of the total), never below one small step.
+    let weight = i === 0 ? top
+      : ctx.equip === 'added' ? Math.max(roundNearest(top - 5 * i, ctx.equip, ctx.gym, ctx.exId), nudge(0, 1, ctx.equip, ctx.gym, ctx.exId))
+      : roundNearest(top * Math.pow(0.9, i), ctx.equip, ctx.gym, ctx.exId);
     // Each set lighter than the one before (28 Oct 2026): at light loads a 10% drop can round back up to
     // the same weight (10 kg dips: 9 rounds to 10), so take one step down instead.
     const prev = out[i - 1]?.weight;

@@ -327,11 +327,13 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         // 6/8/10 like weighted pull-ups (changed 18 Oct 2026 from weighted straight sets).
         const bw = past.filter(p => p.sets.every(s => !s.weight));
         const weighted = history.filter(h => h.weight > 0);
-        const start = program.coachWeights?.find(c => c.ex === ex && session.date > c.from);
+        // The latest weight agreed at a review stands until dips are next done after that review (28 Oct 2026).
+        const start = program.coachWeights?.filter(c => c.ex === ex && session.date > c.from).at(-1);
+        const doneSince = !!start && past.some(p => p.session.date > start.from && p.sets.some(s => s.weight));
         if (weighted.length || start || bw.some(p => dipsGoWeighted(p.result.reps))) {
           equip = 'added';
           const sc = PULLUP_WEIGHTED.scheme;
-          if (!weighted.length) {
+          if (!weighted.length || (start && !doneSince)) {
             targets = rptSets(start?.kg ?? 2.5, sc, sc[0], { ...ctx(), equip });
             reason = start ? `Agreed at your review on ${new Date(start.from + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}: now weighted` : '4 × 10 done: now weighted';
           } else {
@@ -370,10 +372,23 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     // A weight agreed at a review stands in for the suggestion until the lift is next done. After that,
     // progression carries on from whatever was actually logged.
     // Only for sessions after the review it was agreed at.
-    const agreed = program.coachWeights?.find(c => c.ex === ex && (!c.gym || c.gym === gym.id) && session.date > c.from);
+    const agreed = program.coachWeights?.filter(c => c.ex === ex && (!c.gym || c.gym === gym.id) && session.date > c.from).at(-1);
     if (agreed && scheme.t !== 'dips' && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
       const w = roundNearest(agreed.kg, equip, gym, ex);
-      targets = scheme.t === 'rpt' ? rptSets(w, targets.map(t => t.reps), targets[0].reps, ctx()) : targets.map(t => ({ ...t, weight: w }));
+      const before = targets;
+      // A fresh agreed top set aims for the scheme's own reps, not the "one more rep" carried from last time.
+      if (scheme.t === 'rpt') { targets = rptSets(w, scheme.reps, scheme.reps[0], ctx()); repsLabel = scheme.reps.map(String); }
+      else targets = targets.map(t => ({ ...t, weight: w }));
+      // Back-off sets keep what last time earned when that is heavier (28 Oct 2026: 50 kg x 12 on every leg
+      // curl set, then a 57.5 top set agreed, should not send the last set back to 47.5), still under the set before.
+      if (scheme.t === 'rpt') {
+        for (let i = 1; i < targets.length; i++) {
+          const b = before[i], t = targets[i], prev = targets[i - 1].weight;
+          if (!b || b.weight == null || t.weight == null || prev == null || b.weight <= t.weight || b.weight >= prev) continue;
+          targets[i] = b;
+          repsLabel[i] = String(b.reps);
+        }
+      }
       reason = `Agreed at your review on ${new Date(agreed.from + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}`;
     }
 

@@ -531,7 +531,13 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const firstToday = sets.find(s => s.exId === item.ex && s.setNo === 1 && !s.rampUp && !s.extra);
   const overridden = !!firstToday && item.targets[0].weight !== null && firstToday.weight !== item.targets[0].weight;
   const [weight, setWeight] = useState<number | null>(done ? done.weight : overridden ? carried : target.weight ?? carried);
-  const [reps, setReps] = useState(done ? done.reps : target.reps);
+  // Side plank (28 Oct 2026): each time, one more dip (up to the top of the range) and 5 seconds more hold
+  // than the same set and side last time. After a stage change the dips start again at the bottom.
+  const holdsHere = item.scheme.t === 'stage' && !!item.scheme.hold;
+  const sameStage = !!last && last.level === item.level;
+  const aimReps = holdsHere && last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + 1)) : target.reps;
+  const aimHold = holdsHere && last?.holdSec != null ? last.holdSec + (sameStage ? 5 : 0) : null;
+  const [reps, setReps] = useState(done ? done.reps : aimReps);
   const [rir, setRir] = useState<number | null>(done ? done.rir : null);
   const [controlled, setControlled] = useState(done ? !!done.controlled : false);
   const [assist, setAssist] = useState<string>(done?.assist ?? item.assist ?? 'band');
@@ -539,7 +545,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const [stageNow, setStageNow] = useState<number | undefined>(done?.level ?? item.level);
   // Side plank: seconds held after the reps, pre-filled with last time's hold on this side.
   const holds = item.scheme.t === 'stage' && !!item.scheme.hold;
-  const [holdSec, setHoldSec] = useState<number | null>(done ? done.holdSec ?? null : holds ? last?.holdSec ?? 30 : null);
+  const [holdSec, setHoldSec] = useState<number | null>(done ? done.holdSec ?? null : holds ? aimHold ?? 20 : null);
   // What set 1 would be pre-filled with, to come back to after the warm-up sets.
   const working = useRef({ weight, reps });
 
@@ -643,6 +649,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
           {item.reason && !findLoad && <span className="muted right">{item.reason}</span>}
         </div>
         {item.before && round === 0 && !done && <div className="notice inline"><Icon name="info" size={16} /> {item.before}</div>}
+        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{last && sameStage ? ' (one more dip and 5 s more than last time)' : ''}. Stop the hold when your hips start to sag.</div>}
       </div>
       )}
 
