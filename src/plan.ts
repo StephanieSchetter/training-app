@@ -172,6 +172,8 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
 
     let targets: SetTarget[] = [];
     let repsLabel: string[] = [];
+    // Back-off weights earned last time, before they are stepped under this session's top set.
+    let earned: SetTarget[] | null = null;
     let reason = '';
     const ctx = (): LiftCtx => ({ exId: ex, equip, gym, week });
 
@@ -217,6 +219,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
               repsLabel[i] = String(aim);
               return { ...t, weight, reps: aim };
             });
+            earned = targets.slice();
             // Each back-off set stays lighter than the set before it: when rounding to this gym's steps makes
             // two sets the same (16 and 14 both becoming 15), the later one goes one step down (28 Oct 2026).
             for (let i = 1; i < targets.length; i++) {
@@ -375,7 +378,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     const agreed = program.coachWeights?.filter(c => c.ex === ex && (!c.gym || c.gym === gym.id) && session.date > c.from).at(-1);
     if (agreed && scheme.t !== 'dips' && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
       const w = roundNearest(agreed.kg, equip, gym, ex);
-      const before = targets;
+      const before = earned ?? targets;
       // A fresh agreed top set aims for the scheme's own reps, not the "one more rep" carried from last time.
       if (scheme.t === 'rpt') { targets = rptSets(w, scheme.reps, scheme.reps[0], ctx()); repsLabel = scheme.reps.map(String); }
       else targets = targets.map(t => ({ ...t, weight: w }));
