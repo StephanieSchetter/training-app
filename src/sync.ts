@@ -18,7 +18,7 @@ interface Rec { kind: string; id: string; data: unknown }
 interface SyncDisk { pushed: Record<string, number>; since: Record<string, number>; lastPull: string | null; reads?: number }
 const READS_VERSION = 3;
 /** Shown in Settings so it's easy to confirm a phone has picked up the latest update. */
-export const APP_VERSION = 50;
+export const APP_VERSION = 51;
 export interface SyncView {
   auth: 'loading' | 'in' | 'out';
   pending: number;
@@ -228,6 +228,9 @@ export async function syncNow() {
   busy = true;
   try {
     await pull();
+    // Only a download that worked makes this phone's copy safe to work from (29 Oct 2026: a failed one
+    // let an old copy's schedule be shifted and uploaded over the real one).
+    if (!view.settled) setView({ settled: true });
     const p = refreshCount();
     if (p.upserts.length || p.deletes.length) await push(p);
     setView({ error: null });
@@ -237,7 +240,6 @@ export async function syncNow() {
   } finally {
     busy = false;
     refreshCount();
-    if (!view.settled) setView({ settled: true });
   }
 }
 

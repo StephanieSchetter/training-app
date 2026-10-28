@@ -46,8 +46,8 @@ await shot('stretch');
 await click('Stop');
 const before = await text();
 check('Mobility routine: physio movements first, then stretches, with the weekly target', /PHYSIO-PRESCRIBED[\s\S]*Prayer stretch[\s\S]*Standing side bend[\s\S]*Lumbar rock[\s\S]*THEN[\s\S]*Half-kneeling hip flexor/i.test(before) && before.includes('4–5 a week') && !before.includes("Child's pose"));
-for (const s of ['Prayer stretch', 'Standing side bend', 'Lumbar rock', 'Half-kneeling', 'Seated hamstring', 'Calf against', 'Thread-the-needle', 'Side-lying']) await click(s);
-check('Ticking all eight logs the day and counts 1 for the week', (await text()).includes('Routine done') && (await text()).includes('1 session'));
+for (const s of ['Prayer stretch', 'Standing side bend', 'Lumbar rock', 'Half-kneeling', 'Seated hamstring', 'Calf against', 'Thread-the-needle', 'Side-lying', 'Figure-4', 'Ball release']) await click(s);
+check('Ticking all ten (glute med added 29 Oct) logs the day and counts 1 for the week', (await text()).includes('Routine done') && (await text()).includes('1 session'));
 await click('Back');
 check('Home shows the stretch as done for today', (await text()).includes('Done for today'));
 

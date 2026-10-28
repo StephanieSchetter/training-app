@@ -22,10 +22,17 @@ export function dailyChecks() {
     });
   }
 
+  // A slot whose session or run was logged and finished is done, whatever this copy of the schedule says
+  // (29 Oct 2026: an old copy without the done marks shifted three logged sessions as missed).
+  const logged = new Set([...s0.sessions, ...s0.runs].filter(x => x.finishedAt && !x.practice).map(x => x.slotIdx));
+  if (s0.schedule.some(x => !x.done && logged.has(x.idx))) {
+    update(s => { for (const x of s.schedule) if (!x.done && logged.has(x.idx)) x.done = true; });
+  }
+
   // A missed day pushes every remaining session later, so the missed one lands on today.
   // Development only: ?nocatchup lets a scripted test jump to a later date without the schedule following it.
   const frozen = import.meta.env.DEV && new URLSearchParams(location.search).has('nocatchup');
-  const overdue = frozen ? [] : s0.schedule.filter(x => !x.done && !x.skipped && x.date < t).sort((a, b) => a.date.localeCompare(b.date));
+  const overdue = frozen ? [] : s0.schedule.filter(x => !x.done && !logged.has(x.idx) && !x.skipped && x.date < t).sort((a, b) => a.date.localeCompare(b.date));
   const active = [...s0.sessions.filter(x => !x.finishedAt && !x.practice).map(x => x.slotIdx), ...s0.runs.filter(x => !x.finishedAt && !x.practice).map(x => x.slotIdx)];
   if (overdue.length && !overdue.some(x => active.includes(x.idx))) {
     const first = overdue[0];
