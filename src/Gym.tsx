@@ -12,6 +12,8 @@ type Phase = 'start' | 'warmup' | 'lifts' | 'finish';
 const RIRS = ['0', '1', '2', '3', '4+'];
 const fmtKg = (w: number | null) => (w === null ? '—' : `${w} kg`);
 const sideName = (s?: 'L' | 'R') => (s === 'L' ? 'Left' : s === 'R' ? 'Right' : '');
+/** Side plank holds aim no higher than this. */
+const HOLD_CAP = 45;
 const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.holdSec != null ? ` + ${s.holdSec} s hold` : ''}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
 export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
 
@@ -536,7 +538,8 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const holdsHere = item.scheme.t === 'stage' && !!item.scheme.hold;
   const sameStage = !!last && last.level === item.level;
   const aimReps = holdsHere && last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + 1)) : target.reps;
-  const aimHold = holdsHere && last?.holdSec != null ? last.holdSec + (sameStage ? 5 : 0) : null;
+  // The hold aim stops growing at 45 s (28 Oct 2026): past that, harder comes from more dips and the next stage.
+  const aimHold = holdsHere && last?.holdSec != null ? Math.min(HOLD_CAP, last.holdSec + (sameStage ? 5 : 0)) : null;
   const [reps, setReps] = useState(done ? done.reps : aimReps);
   const [rir, setRir] = useState<number | null>(done ? done.rir : null);
   const [controlled, setControlled] = useState(done ? !!done.controlled : false);
@@ -649,7 +652,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
           {item.reason && !findLoad && <span className="muted right">{item.reason}</span>}
         </div>
         {item.before && round === 0 && !done && <div className="notice inline"><Icon name="info" size={16} /> {item.before}</div>}
-        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{last && sameStage ? ' (one more dip and 5 s more than last time)' : ''}. Stop the hold when your hips start to sag.</div>}
+        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{last && sameStage ? (aimHold === HOLD_CAP ? ' (45 s is the top for holds; progress now comes from dips and the next stage)' : ' (one more dip and 5 s more than last time)') : ''}. Stop the hold when your hips start to sag.</div>}
       </div>
       )}
 
