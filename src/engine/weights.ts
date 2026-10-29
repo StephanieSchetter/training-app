@@ -36,6 +36,29 @@ export function gridStep(equip: Equip, gym: GymProfile, exId: string): number | 
 /** Both gyms have light dumbbells in 1 kg steps up to 10 kg; above that the gym's usual step (16 Oct 2026). */
 export const LIGHT_DUMBBELLS = { upTo: 10, step: 1 };
 
+/** Dumbbell lifts that may use a kettlebell when one sits between two dumbbells, e.g. 14 between 12.5 and 15
+ *  (30 Oct 2026). Not curls (awkward to hold) or pressing. */
+export const KETTLEBELL_OK = ['step_up', 'lateral_raise', 'sl_rdl', 'sl_calf', 'sl_calf_step_db', 'seated_db_calf'];
+const DUMBBELL_TOP = 60;
+
+/** Every weight available for this lift here, when dumbbells and kettlebells are mixed; otherwise null. */
+function mixed(equip: Equip, gym: GymProfile, exId: string): number[] | null {
+  if (equip !== 'dumbbell' || !gym.kettlebells.length || !KETTLEBELL_OK.includes(exId)) return null;
+  const dbs: number[] = [];
+  for (let w = LIGHT_DUMBBELLS.step; w <= LIGHT_DUMBBELLS.upTo + EPS; w += LIGHT_DUMBBELLS.step) dbs.push(tidy(w));
+  for (let w = LIGHT_DUMBBELLS.upTo + gym.dumbbellStep; w <= DUMBBELL_TOP + EPS; w += gym.dumbbellStep) dbs.push(tidy(w));
+  return [...new Set([...dbs, ...gym.kettlebells])].sort((a, b) => a - b);
+}
+
+/** True when this weight is only available as a kettlebell (the set screen says so). */
+export function kettlebellOnly(w: number | null, equip: Equip, gym: GymProfile, exId: string): boolean {
+  if (w === null || !mixed(equip, gym, exId)) return false;
+  const k = stack(equip, gym, exId);
+  const onDumbbells = k ? (w <= k.from ? Math.abs(w / k.step - Math.round(w / k.step)) < 1e-6 : Math.abs((w - k.from) / k.then - Math.round((w - k.from) / k.then)) < 1e-6)
+    : Math.abs(w / gym.dumbbellStep - Math.round(w / gym.dumbbellStep)) < 1e-6;
+  return !onDumbbells && gym.kettlebells.some(b => Math.abs(b - w) < 1e-6);
+}
+
 function stack(equip: Equip, gym: GymProfile, exId: string): { step: number; from: number; then: number } | null {
   if (equip === 'dumbbell' && gym.dumbbellStep > LIGHT_DUMBBELLS.step) return { step: LIGHT_DUMBBELLS.step, from: LIGHT_DUMBBELLS.upTo, then: gym.dumbbellStep };
   const step = gym.machineSteps[exId];
@@ -45,6 +68,8 @@ function stack(equip: Equip, gym: GymProfile, exId: string): { step: number; fro
 
 /** Round to the nearest available weight; an exact tie goes to the lighter one. */
 export function roundNearest(w: number, equip: Equip, gym: GymProfile, exId: string): number {
+  const all = mixed(equip, gym, exId);
+  if (all) return all.reduce((best, b) => (Math.abs(b - w) < Math.abs(best - w) - EPS ? b : best), all[0]);
   const k = stack(equip, gym, exId);
   if (k) {
     return w <= k.from
@@ -62,6 +87,8 @@ export function roundNearest(w: number, equip: Equip, gym: GymProfile, exId: str
 }
 
 export function roundDown(w: number, equip: Equip, gym: GymProfile, exId: string): number {
+  const all = mixed(equip, gym, exId);
+  if (all) { const below = all.filter(b => b <= w + EPS); return below.length ? Math.max(...below) : w; }
   if (equip === 'kettlebell') {
     const below = gym.kettlebells.filter(b => b <= w + EPS);
     return below.length ? Math.max(...below) : w;
@@ -75,6 +102,8 @@ export function roundDown(w: number, equip: Equip, gym: GymProfile, exId: string
 
 /** The smallest increase allowed for this lift at this gym. */
 export function oneStepUp(w: number, equip: Equip, gym: GymProfile, exId: string): number {
+  const all = mixed(equip, gym, exId);
+  if (all) { const above = all.filter(b => b > w + EPS); return above.length ? Math.min(...above) : w; }
   if (equip === 'kettlebell') {
     const above = gym.kettlebells.filter(b => b > w + EPS);
     return above.length ? Math.min(...above) : w;
@@ -95,6 +124,9 @@ export function oneStepUp(w: number, equip: Equip, gym: GymProfile, exId: string
 
 /** The weight one tap of plus or minus moves to on the set screen. Uneven machine stacks follow their own positions. */
 export function nudge(w: number, dir: 1 | -1, equip: Equip, gym: GymProfile, exId: string): number {
+  const all = mixed(equip, gym, exId);
+  if (all && dir > 0) return oneStepUp(w, equip, gym, exId);
+  if (all) { const below = all.filter(b => b < w - EPS); return below.length ? Math.max(...below) : 0; }
   const k = stack(equip, gym, exId);
   if (k && dir > 0) return oneStepUp(w, equip, gym, exId);
   if (k) {

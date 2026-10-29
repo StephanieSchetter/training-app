@@ -257,7 +257,8 @@ describe('light dumbbells go in 1 kg steps up to 10 kg', () => {
     expect(roundNearest(9, 'dumbbell', fifo, 'lateral_raise')).toBe(9);
     expect(oneStepUp(9, 'dumbbell', fifo, 'lateral_raise')).toBe(10);
     expect(oneStepUp(10, 'dumbbell', fifo, 'lateral_raise')).toBe(12);
-    expect(oneStepUp(10, 'dumbbell', adelaide, 'lateral_raise')).toBe(12.5);
+    expect(oneStepUp(10, 'dumbbell', adelaide, 'hammer_curl')).toBe(12.5);
+    expect(oneStepUp(10, 'dumbbell', adelaide, 'lateral_raise')).toBe(12); // a 12 kg kettlebell in between (30 Oct 2026)
     expect(nudge(12.5, -1, 'dumbbell', adelaide, 'x')).toBe(10);
     expect(nudge(10, -1, 'dumbbell', adelaide, 'x')).toBe(9);
     expect(suggestStraight(3, [12, 15], [{ gymId: 'fifo', weight: 9, reps: [15, 13, 12] }], lat(fifo)).sets[0].weight).toBe(10);

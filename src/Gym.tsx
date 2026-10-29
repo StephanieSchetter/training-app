@@ -1,6 +1,6 @@
 // Gym session flow (spec 5.2): start -> warm-up -> one exercise per screen -> finish.
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { nudge, roundNearest } from './engine/weights';
+import { kettlebellOnly, nudge, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
@@ -656,9 +656,10 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
       </div>
       )}
 
-      {item.usesWeight && (
+      {item.usesWeight && (<>
         <Stepper label="Weight" unit={item.equip === 'added' ? 'kg added' : item.equip === 'dumbbell' ? 'kg each' : item.info.perSide ? 'kg each side' : 'kg'} value={weight} onMinus={() => bump(-1)} onPlus={() => bump(1)} onType={setWeight} />
-      )}
+        {kettlebellOnly(weight, item.equip, gym, item.ex) && <p className="small muted">Use {weight} kg kettlebells (between two dumbbell sizes).</p>}
+      </>)}
       <Stepper label={unit === 'reps' ? 'Reps' : 'Distance'} unit={unit} value={reps} onMinus={() => setReps(r => Math.max(0, r - 1))} onPlus={() => setReps(r => r + 1)} />
 
       {!pending && <div className="field">
