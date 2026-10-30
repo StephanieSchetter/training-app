@@ -48,7 +48,7 @@ await seed('oct13', 20, '2026-10-13', [
 await wait(300);
 await click('Gym B');
 check('Next Tuesday: leg extension is the weight agreed at the latest review (57.5, 20 Oct), not 70', (await line('Leg Extension')).includes('57.5 kg'), await line('Leg Extension'));
-check('Next Tuesday at FIFO: calf raise is on the leg press, at the agreed 120 kg', (await line('A1Leg Press Calf Raise')).includes('120 kg'), await line('A1Leg Press Calf Raise'));
+check('Next Tuesday at FIFO: calf raise is on the leg press, at the agreed 120 kg', (await line('Leg Press Calf Raise')).includes('120 kg'), await line('Leg Press Calf Raise'));
 check('Lifts with nothing agreed are untouched (row stays 50 kg)', (await line('Iso-Lateral Row')).includes('50 kg'), await line('Iso-Lateral Row'));
 await click('Back');
 await click('Start Gym B'); await click('Start warm-up'); await click('Start lifting');
@@ -59,7 +59,7 @@ for (let i = 0; i < 2; i++) await click('Next exercise');
 await click('Skip warm-up sets');   // warm-up sets come first since 15 Oct
 t = await text();
 check('On the day it says where the weight came from', /Leg Extension/i.test(t) && t.includes('57.5 kg') && t.includes('Agreed at your review on 20 Oct'), t.slice(0, 260));
-for (let i = 0; i < 2; i++) await click('Next exercise');
+for (let i = 0; i < 3; i++) await click('Next exercise');   // no pairs since 30 Oct: calf raise, curl, then knee raises
 t = await text();
 check('Knee raises: log controlled hanging reps, top up, dead hang afterwards', /Hanging Knee Raise/i.test(t) && t.includes('top each set up to 10 with lying knee raises') && t.includes('after the last set'), t.slice(0, 300));
 

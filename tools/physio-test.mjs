@@ -137,8 +137,9 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const a = await fresh('2026-10-16');
   await a.click('Start Gym A');
   const t = (await a.text()).split("TODAY'S EXERCISES")[1];
-  const order = ['Kettlebell Swing', 'Incline Barbell Press', 'Barbell Hip Thrust', 'A1', '45° Back Extension', 'A2', '45° Lateral Bend', 'B1', 'Dumbbell Lateral Raise', 'B2', 'Overhead Cable Triceps', 'Pallof Press'];
-  check('Friday: order and pairs (A1 back extension / A2 lateral bend, B1 lateral raise / B2 triceps)', order.every((n, i) => i === 0 || t.indexOf(order[i - 1]) < t.indexOf(n, t.indexOf(order[i - 1]))), t);
+  const order = ['Kettlebell Swing', 'Incline Barbell Press', 'Barbell Hip Thrust', '45° Back Extension', '45° Lateral Bend', 'Dumbbell Lateral Raise', 'Overhead Cable Triceps', 'Pallof Press'];
+  // No pairs since 30 Oct 2026 (busy gyms): one exercise at a time.
+  check('Friday: order, one exercise at a time (no A1/A2 pairs)', !/[AB][12]45°|[AB][12]Dumbbell/.test(t) && order.every((n, i) => i === 0 || t.indexOf(order[i - 1]) < t.indexOf(n, t.indexOf(order[i - 1]))), t);
   check('Friday: lateral bend starts at stage 1, hands by sides, 3 × 10–12 each side', /45° Lateral Bend · Stage 1: Hands by sides\s*3 × 10–12 each side/.test(t));
   await a.shot('friday');
   await a.close();
@@ -146,8 +147,8 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   await d.click('Start Gym D');
   const s = (await d.text()).split("TODAY'S EXERCISES")[1];
   const od = ['Single-Leg Romanian Deadlift', 'Dips', 'Lying Leg Curl',   // at FIFO Nordics swap to a lying leg curl (18 Oct)
-    'A1', 'Face Pull', 'A2', 'Hammer Curl', 'Single-Leg Calf Raise', 'B1', '45° Back Extension', 'B2', '45° Lateral Bend'];
-  check('Sunday: order and pairs; the side plank (back by Dan, 27 Oct 2026) comes last', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && s.lastIndexOf('Side Plank') > s.indexOf(od.at(-1)), s);
+    'Face Pull', 'Hammer Curl', 'Single-Leg Calf Raise', '45° Back Extension', '45° Lateral Bend'];
+  check('Sunday: order (no pairs); the side plank (back by Dan, 27 Oct 2026) comes last', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && s.lastIndexOf('Side Plank') > s.indexOf(od.at(-1)), s);
   await d.close();
 }
 
