@@ -197,6 +197,13 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const saved = await log.page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'side_plank' && s.sessionId !== 'a1').map(s => `${s.side}${s.setNo}:${s.reps}+${s.holdSec}s L${s.level}`).join());
   check('Side plank: the set is saved with the seconds held', saved === 'L1:13+55s L1', saved);
   await log.close();
+  // 3 Nov 2026: one thing at a time. Below 45 s the hold builds with the same dips.
+  const hold = await fresh('2026-10-18', fri(sp(2, 12, 1)));
+  await hold.click('Start Gym'); await hold.click('Start warm-up'); await hold.click('Start lifting');
+  for (let i = 0; i < 15 && !(await hold.text()).includes('Hold at the end'); i++) await hold.click('Next exercise');
+  const ht = await hold.text();
+  check('Side plank set screen: last time 12 dips + 30 s -> same 12 dips, hold 35 s', ht.includes('Aim today: 12 dips, then hold 35 s') && ht.includes('same dips, 5 s more hold'), ht.slice(0, 300));
+  await hold.close();
 }
 
 // 5. Lateral bend: up a stage only at 12 on every set, both sides, all controlled

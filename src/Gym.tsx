@@ -533,11 +533,13 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const firstToday = sets.find(s => s.exId === item.ex && s.setNo === 1 && !s.rampUp && !s.extra);
   const overridden = !!firstToday && item.targets[0].weight !== null && firstToday.weight !== item.targets[0].weight;
   const [weight, setWeight] = useState<number | null>(done ? done.weight : overridden ? carried : target.weight ?? carried);
-  // Side plank (28 Oct 2026): each time, one more dip (up to the top of the range) and 5 seconds more hold
-  // than the same set and side last time. After a stage change the dips start again at the bottom.
+  // Side plank (3 Nov 2026): one thing at a time. The hold builds first, 5 seconds more than the same set and
+  // side last time with the same dips, until 45 s; then the dips go up one a time (to the top of the range)
+  // with the hold kept at 45 s. After a stage change the dips start again at the bottom.
   const holdsHere = item.scheme.t === 'stage' && !!item.scheme.hold;
   const sameStage = !!last && last.level === item.level;
-  const aimReps = holdsHere && last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + 1)) : target.reps;
+  const holdBuilt = last?.holdSec == null || last.holdSec >= HOLD_CAP;
+  const aimReps = holdsHere && last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + (holdBuilt ? 1 : 0))) : target.reps;
   // The hold aim stops growing at 45 s (28 Oct 2026): past that, harder comes from more dips and the next stage.
   const aimHold = holdsHere && last?.holdSec != null ? Math.min(HOLD_CAP, last.holdSec + (sameStage ? 5 : 0)) : null;
   const [reps, setReps] = useState(done ? done.reps : aimReps);
@@ -652,7 +654,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
           {item.reason && !findLoad && <span className="muted right">{item.reason}</span>}
         </div>
         {item.before && round === 0 && !done && <div className="notice inline"><Icon name="info" size={16} /> {item.before}</div>}
-        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{last && sameStage ? (aimHold === HOLD_CAP ? ' (45 s is the top for holds; progress now comes from dips and the next stage)' : ' (one more dip and 5 s more than last time)') : ''}. Stop the hold when your hips start to sag.</div>}
+        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{last && sameStage ? (aimHold === HOLD_CAP ? ' (45 s is the top for holds; progress now comes from dips and the next stage)' : ' (same dips, 5 s more hold than last time; the dips go up once the hold reaches 45 s)') : ''}. Stop the hold when your hips start to sag.</div>}
       </div>
       )}
 
