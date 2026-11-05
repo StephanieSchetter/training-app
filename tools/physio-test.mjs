@@ -189,7 +189,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   // Logging: at the 45 s top the dips go up; below it the hold builds with the same dips (3 Nov 2026)
   const log = await fresh('2026-10-18', fri(sp(2, 12, 1, true, 45)));
   const st = await mob(log);
-  check('Side plank aim: last time 12 dips + 45 s -> 13 dips, hold 45 s', st.includes('Aim today: 13 dips, then hold 45 s') && st.includes('45 s is the top'), st.slice(-900));
+  check('Side plank aim: every set held 45 s with 12 dips last time -> 13 dips, hold 45 s', st.includes('Aim today: 13 dips, then hold 45 s') && st.includes('so one more dip'), st.slice(-900));
   await log.click('Controlled'); await log.click('Log left side');
   const after = await log.text();
   const saved = await log.page.evaluate(() => { const s = window.__dev.getState(); const m = s.sessions.filter(x => x.type === 'mobility'); return m.length + ':' + s.sets.filter(x => x.exId === 'side_plank' && x.sessionId === m[0]?.id).map(x => `${x.side}${x.setNo}:${x.reps}+${x.holdSec}s L${x.level}${x.controlled ? ' c' : ''}`).join(); });
@@ -200,8 +200,21 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   await log.close();
   const hold = await fresh('2026-10-18', fri(sp(2, 12, 1)));
   const ht = await mob(hold);
-  check('Side plank aim: last time 12 dips + 30 s -> same 12 dips, hold 35 s', ht.includes('Aim today: 12 dips, then hold 35 s') && ht.includes('same dips, 5 s more hold'), ht.slice(-900));
+  check('Side plank aim: last time 12 dips + 30 s -> same 12 dips, hold 35 s', ht.includes('Aim today: 12 dips, then hold 35 s') && ht.includes('same dips until every set and side holds 45 s'), ht.slice(-900));
   await hold.close();
+  // Brad, 5 Nov 2026: the dips wait until every set and side held 45 s
+  const mixed = await fresh('2026-10-18', fri(sp(2, 12, 1, true, 45).map(r => (r[1] === 2 ? [r[0], r[1], r[2], r[3], { ...r[4], holdSec: 30 }] : r))));
+  const mt = await mob(mixed);
+  check('Side plank aim: set 1 held 45 s but set 2 only 30 s -> set 1 stays at 12 dips + 45 s', mt.includes('Aim today: 12 dips, then hold 45 s'), mt.slice(-900));
+  await mixed.close();
+  // Stage 2 only adds a set: sets 1–2 carry on at 15 + 45 s, the new third set starts at 10 dips + 30 s
+  const st2 = await fresh('2026-10-18', fri(sp(2, 15, 1, true, 45)));
+  const s2 = await mob(st2);
+  check('Side plank stage 2: set 1 carries on at 15 dips + 45 s', /Stage 2/i.test(s2) && s2.includes('Aim today: 15 dips, then hold 45 s'), s2.slice(-900));
+  for (let i = 0; i < 2; i++) { await st2.click('Log left side'); await st2.click('Log right side'); }
+  const s3 = await st2.text();
+  check('Side plank stage 2: the new third set starts at 10 dips + 30 s', /Set 3 of 3 · Left side/i.test(s3) && s3.includes('Aim today: 10 dips, then hold 30 s') && s3.includes('a new set'), s3.slice(-900));
+  await st2.close();
 }
 
 // 5. Lateral bend: up a stage only at 12 on every set, both sides, all controlled

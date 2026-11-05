@@ -132,15 +132,30 @@ export function pastFor(state: AppState, exId: string, before: SessionLog): Past
 /** Side plank holds aim no higher than this. */
 export const HOLD_CAP = 45;
 
-/** Side plank aim for one set and side (3 Nov 2026): one thing at a time. The hold builds first, 5 seconds more than the
- *  same set and side last time with the same dips, until 45 s; then the dips go up one at a time (to the top of the range)
- *  with the hold kept at 45 s. After a stage change the dips start again at the bottom. */
-export function sidePlankAim(item: PlanItem, last: SetLog | undefined, fallbackReps: number) {
+/** Side plank aim for one set and side (Brad, 5 Nov 2026): one thing at a time. Each hold builds 5 seconds a time
+ *  (same set and side as last time) up to 45 s, with the dips unchanged until every set and side held 45 s last time;
+ *  then every set aims one more dip (to the top of the range), the holds staying at 45 s. A stage that only adds a set
+ *  carries the other sets' aims on, and the new set starts at the bottom of the range with a 30 s hold; a stage with a
+ *  new movement (the top-leg lift) starts the dips again at the bottom. lastTime: every set of the last session. */
+export function sidePlankAim(item: PlanItem, last: SetLog | undefined, fallbackReps: number, lastTime: SetLog[] = []) {
+  const sc = item.scheme;
+  if (sc.t !== 'stage') return { reps: fallbackReps, hold: null, sameStage: false, note: '' };
+  const setsAt = (n: number | undefined) => (n ? sc.stages?.[n - 1]?.sets : undefined) ?? sc.sets;
   const sameStage = !!last && last.level === item.level;
-  const holdBuilt = last?.holdSec == null || last.holdSec >= HOLD_CAP;
-  const reps = last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + (holdBuilt ? 1 : 0))) : fallbackReps;
-  const hold = last?.holdSec != null ? Math.min(HOLD_CAP, last.holdSec + (sameStage ? 5 : 0)) : null;
-  return { reps, hold, sameStage };
+  const addsSets = !!last && !sameStage && (last.level ?? 1) < (item.level ?? 1) && setsAt(item.level) > setsAt(last.level);
+  const carry = sameStage || addsSets;
+  const work = lastTime.filter(s => !s.rampUp && !s.extra);
+  const allHeld = work.length > 0 && work.every(s => s.holdSec == null || s.holdSec >= HOLD_CAP);
+  const top = sc.range[1];
+  const reps = last && carry ? Math.min(top, Math.max(sc.range[0], last.reps + (sameStage && allHeld ? 1 : 0))) : fallbackReps;
+  const newSet = !last && work.length > 0;
+  const hold = last?.holdSec != null ? Math.min(HOLD_CAP, last.holdSec + (carry ? 5 : 0)) : newSet ? 30 : null;
+  const note = !last ? (newSet ? 'a new set: build the hold to 45 s first, then the dips' : '')
+    : !carry ? 'new stage: the dips start again at the bottom'
+    : reps === top && hold === HOLD_CAP && last.reps >= top ? `${top} dips and 45 s: the top of this stage`
+    : sameStage && allHeld ? 'every set held 45 s last time, so one more dip'
+    : 'same dips until every set and side holds 45 s; 5 s more hold than last time';
+  return { reps, hold, sameStage, note };
 }
 
 /** Most recent logged set for "last time" under the target. */

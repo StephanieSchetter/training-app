@@ -4,7 +4,7 @@ import { kettlebellOnly, nudge, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
-import { autoSwaps, blocks, buildPlan, HOLD_CAP, lastSet, leftOut, PlanItem, sidePlankAim, stageNames, Step, stepsFor } from './plan';
+import { autoSwaps, blocks, buildPlan, lastSet, leftOut, pastFor, PlanItem, sidePlankAim, stageNames, Step, stepsFor } from './plan';
 import { AppState, DROP, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
 import { AppBar, clock, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
@@ -533,7 +533,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const [weight, setWeight] = useState<number | null>(done ? done.weight : overridden ? carried : target.weight ?? carried);
   // Side plank: the hold builds to 45 s first, then the dips (3 Nov 2026).
   const holdsHere = item.scheme.t === 'stage' && !!item.scheme.hold;
-  const aim = sidePlankAim(item, last, target.reps);
+  const aim = sidePlankAim(item, last, target.reps, holdsHere ? pastFor(state, item.ex, session).at(-1)?.sets : []);
   const sameStage = aim.sameStage;
   const aimReps = holdsHere ? aim.reps : target.reps;
   const aimHold = holdsHere ? aim.hold : null;
@@ -649,7 +649,7 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
           {item.reason && !findLoad && <span className="muted right">{item.reason}</span>}
         </div>
         {item.before && round === 0 && !done && <div className="notice inline"><Icon name="info" size={16} /> {item.before}</div>}
-        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{last && sameStage ? (aimHold === HOLD_CAP ? ' (45 s is the top for holds; progress now comes from dips and the next stage)' : ' (same dips, 5 s more hold than last time; the dips go up once the hold reaches 45 s)') : ''}. Stop the hold when your hips start to sag.</div>}
+        {holdsHere && !done && <div className="muted small">Aim today: {aimReps} dips, then hold {aimHold ?? 20} s{aim.note ? ` (${aim.note})` : ''}. Stop the hold when your hips start to sag.</div>}
       </div>
       )}
 

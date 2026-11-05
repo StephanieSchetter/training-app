@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { addDays } from './engine/schedule';
 import { useWakeLock } from './Gym';
-import { buildPlan, HOLD_CAP, lastSet, sidePlankAim, stageNames } from './plan';
+import { buildPlan, lastSet, pastFor, sidePlankAim, stageNames } from './plan';
 import { AppState, gymForDate, MOBILITY, SessionLog, SetLog, today, uid, update, write } from './store';
 import { AppBar, Dock, Icon, Segmented, Stepper } from './ui';
 
@@ -113,7 +113,7 @@ function SidePlankCard({ state }: { state: AppState }) {
   const steps = item ? Array.from({ length: item.targets.length }, (_, i) => i + 1).flatMap(n => (['L', 'R'] as const).map(side => ({ n, side }))) : [];
   const next = steps.find(st => !logged.some(x => x.setNo === st.n && x.side === st.side));
   const last = item && next ? lastSet(state, item.ex, next.n, next.side, session, false) : undefined;
-  const aim = item ? sidePlankAim(item, last, item.targets[0]?.reps ?? 10) : null;
+  const aim = item ? sidePlankAim(item, last, item.targets[0]?.reps ?? 10, pastFor(state, item.ex, session).at(-1)?.sets) : null;
   const key = next ? `${next.n}${next.side}` : 'done';
   const [form, setForm] = useState<{ key: string; reps: number; hold: number | null; controlled: boolean; stage: number | undefined }>({ key: '', reps: 0, hold: null, controlled: false, stage: undefined });
   const f = form.key === key ? form : { key, reps: aim?.reps ?? 10, hold: aim?.hold ?? 20, controlled: false, stage: logged.at(-1)?.level ?? item?.level };
@@ -149,7 +149,7 @@ function SidePlankCard({ state }: { state: AppState }) {
       {next ? (
         <div className="card">
           <div className="overline">Set {next.n} of {item.targets.length} · {next.side === 'L' ? 'Left' : 'Right'} side</div>
-          <div className="muted small">Aim today: {aim?.reps} dips, then hold {aim?.hold ?? 20} s{last && aim?.sameStage ? (aim.hold === HOLD_CAP ? ' (45 s is the top for holds; progress now comes from dips and the next stage)' : ' (same dips, 5 s more hold than last time; the dips go up once the hold reaches 45 s)') : ''}. Stop the hold when your hips start to sag.</div>
+          <div className="muted small">Aim today: {aim?.reps} dips, then hold {aim?.hold ?? 20} s{aim?.note ? ` (${aim.note})` : ''}. Stop the hold when your hips start to sag.</div>
           {last && <div className="muted small">Last time: {last.reps} dips{last.holdSec != null ? ` + ${last.holdSec} s` : ''}</div>}
           <Stepper label="Dips" unit="reps" value={f.reps} onMinus={() => set({ reps: Math.max(0, f.reps - 1) })} onPlus={() => set({ reps: f.reps + 1 })} onType={v => set({ reps: v ?? 0 })} />
           <Stepper label="Hold at the end" unit="seconds" value={f.hold} onMinus={() => set({ hold: Math.max(0, (f.hold ?? 0) - 5) })} onPlus={() => set({ hold: (f.hold ?? 0) + 5 })} onType={v => set({ hold: v })} />
