@@ -101,7 +101,7 @@ export function heldSince(state: AppState, exId: string): string | null {
 /** Lifts in program order, grouped by session, for the Progress list. */
 export function liftList(state: AppState): { session: string; items: { exId: string; name: string }[] }[] {
   const p = state.program!;
-  return ['gymB', 'gymC', 'gymA', 'gymD'].filter(k => p.sessions[k]).map(k => ({
+  return ['gymB', 'gymC', 'gymA', 'gymD', 'mobility'].filter(k => p.sessions[k]).map(k => ({
     session: p.sessions[k].name,
     items: p.sessions[k].items.filter(i => i.scheme.t !== 'log' && !i.warmup).map(i => ({ exId: i.ex, name: p.exercises[i.ex].name })),
   }));

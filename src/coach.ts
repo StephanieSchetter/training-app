@@ -5,7 +5,7 @@ import { matchActivity, matchRepLaps } from './engine/garmin';
 import { EASY_HR_HIGH } from './engine/running';
 import { addDays } from './engine/schedule';
 import { mobilityTargetText, mobilityThisWeek } from './Stretch';
-import { AppState, currentSpeeds, GarminActivity, RunLog } from './store';
+import { AppState, currentSpeeds, GarminActivity, MOBILITY, RunLog } from './store';
 
 export interface Note { tone: 'good' | 'watch' | 'info'; text: string }
 export interface Debrief { verdict: string; tone: Note['tone']; notes: Note[]; next?: string }
@@ -224,7 +224,7 @@ export function weeklyReview(state: AppState, week: number, today: string): Week
   const quality = [iv ? `intervals ${ANSWER[iv]}` : null, th ? `threshold ${ANSWER[th]}` : null, easy.length ? (easyHard ? `${easyHard} of ${easy.length} easy runs didn't stay easy` : 'easy runs stayed easy') : null].filter(Boolean);
   if (quality.length) notes.push({ tone: iv === 'dnf' || th === 'dnf' || easyHard ? 'watch' : 'good', text: `Runs: ${quality.join(', ')}.` });
 
-  const gym = state.sessions.filter(s => !s.practice && s.finishedAt && inWeek(s.date));
+  const gym = state.sessions.filter(s => !s.practice && s.type !== MOBILITY && s.finishedAt && inWeek(s.date));
   const sets = state.sets.filter(x => gym.some(s => s.id === x.sessionId) && !x.rampUp && !x.extra).length;
   const worse = state.checkins.filter(c => gym.some(s => s.id === c.sessionId) && (c.knee === 'worse' || c.back === 'worse')).length;
   if (gym.length) notes.push({ tone: worse ? 'watch' : 'info', text: `Gym: ${gym.length} session${gym.length > 1 ? 's' : ''}, ${sets} sets logged.${worse ? ` Knee or back was worse the next morning ${worse === 1 ? 'once' : `${worse} times`}.` : ''}` });

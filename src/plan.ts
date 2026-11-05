@@ -5,7 +5,7 @@ import {
   backExtensionGoWeighted, deloadSetCount, rampSets, dipsGoWeighted, lateralBendStageUp, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
   PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
 } from './engine/progression';
-import { DROP } from './store';
+import { DROP, MOBILITY } from './store';
 import type { AppState, Exercise, Program, ProgramItem, Scheme, SessionLog, SetLog } from './store';
 
 export interface PlanItem {
@@ -115,7 +115,7 @@ export function pastFor(state: AppState, exId: string, before: SessionLog): Past
   const real = state.sessions.filter(s => !s.practice).sort((a, b) => a.startedAt - b.startedAt);
   // A miss is excused when the check-in the morning after the previous gym session was "worse" (6.6).
   const worseBefore = (s: SessionLog) => {
-    const prev = real.filter(p => p.startedAt < s.startedAt).at(-1);
+    const prev = real.filter(p => p.type !== MOBILITY && p.startedAt < s.startedAt).at(-1);
     const c = prev && state.checkins.find(x => x.sessionId === prev.id);
     return !!c && (c.knee === 'worse' || c.back === 'worse');
   };
@@ -127,6 +127,20 @@ export function pastFor(state: AppState, exId: string, before: SessionLog): Past
       return result ? { session, sets, result } : null;
     })
     .filter((x): x is Past => x !== null);
+}
+
+/** Side plank holds aim no higher than this. */
+export const HOLD_CAP = 45;
+
+/** Side plank aim for one set and side (3 Nov 2026): one thing at a time. The hold builds first, 5 seconds more than the
+ *  same set and side last time with the same dips, until 45 s; then the dips go up one at a time (to the top of the range)
+ *  with the hold kept at 45 s. After a stage change the dips start again at the bottom. */
+export function sidePlankAim(item: PlanItem, last: SetLog | undefined, fallbackReps: number) {
+  const sameStage = !!last && last.level === item.level;
+  const holdBuilt = last?.holdSec == null || last.holdSec >= HOLD_CAP;
+  const reps = last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + (holdBuilt ? 1 : 0))) : fallbackReps;
+  const hold = last?.holdSec != null ? Math.min(HOLD_CAP, last.holdSec + (sameStage ? 5 : 0)) : null;
+  return { reps, hold, sameStage };
 }
 
 /** Most recent logged set for "last time" under the target. */

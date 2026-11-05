@@ -11,7 +11,7 @@ import { easyPace, trendTiles } from './stats';
 import { energyView } from './nutrition';
 import { latestRunForDebrief, reviewToShow, runDebrief } from './coach';
 import { DebriefCard, ReviewCard } from './CoachCards';
-import { AppState, Checkin, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
+import { AppState, Checkin, MOBILITY, currentSpeeds, Feel, gymForDate, RunType, today, uid, update, VIEW_ONLY } from './store';
 import { autoGarminSync, requestGarminSync, syncNow, SyncView, waitingTooLong } from './sync';
 import { Icon, Segmented, Sheet, SyncNowButton } from './ui';
 import { HeavyGuardCard, NAMES, niceDate, Target, TravelCard, TypeIcon } from './Views';
@@ -34,7 +34,7 @@ function CheckinCard({ state, t }: { state: AppState; t: string }) {
   const [back, setBack] = useState<Feel>('ok');
   // Every gym day gets its own check (the deadlift rule depends on Thursday's), oldest unanswered first.
   const last = state.sessions
-    .filter(s => !s.practice && s.finishedAt && s.date < t && daysBetween(s.date, t) <= 3 && !state.checkins.some(c => c.sessionId === s.id))
+    .filter(s => !s.practice && s.type !== MOBILITY && s.finishedAt && s.date < t && daysBetween(s.date, t) <= 3 && !state.checkins.some(c => c.sessionId === s.id))
     .sort((a, b) => a.startedAt - b.startedAt)[0];
   if (!last) return null;
   const save = () => {

@@ -4,7 +4,7 @@ import { kettlebellOnly, nudge, roundNearest } from './engine/weights';
 import { NORDIC_LEVELS } from './engine/progression';
 import { readinessSuggestion } from './engine/running';
 import type { SessionType, Slot } from './engine/schedule';
-import { autoSwaps, blocks, buildPlan, lastSet, leftOut, PlanItem, stageNames, Step, stepsFor } from './plan';
+import { autoSwaps, blocks, buildPlan, HOLD_CAP, lastSet, leftOut, PlanItem, sidePlankAim, stageNames, Step, stepsFor } from './plan';
 import { AppState, DROP, gymForDate, SessionLog, SetLog, today, uid, update, useStore, write } from './store';
 import { AppBar, clock, Dock, Elapsed, Icon, Segmented, Sheet, Stepper } from './ui';
 
@@ -12,8 +12,6 @@ type Phase = 'start' | 'warmup' | 'lifts' | 'finish';
 const RIRS = ['0', '1', '2', '3', '4+'];
 const fmtKg = (w: number | null) => (w === null ? '—' : `${w} kg`);
 const sideName = (s?: 'L' | 'R') => (s === 'L' ? 'Left' : s === 'R' ? 'Right' : '');
-/** Side plank holds aim no higher than this. */
-const HOLD_CAP = 45;
 const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.holdSec != null ? ` + ${s.holdSec} s hold` : ''}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
 export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
 
@@ -533,15 +531,12 @@ function SetEditor({ state, session, sets, step, block, gymId, timer, onLogged, 
   const firstToday = sets.find(s => s.exId === item.ex && s.setNo === 1 && !s.rampUp && !s.extra);
   const overridden = !!firstToday && item.targets[0].weight !== null && firstToday.weight !== item.targets[0].weight;
   const [weight, setWeight] = useState<number | null>(done ? done.weight : overridden ? carried : target.weight ?? carried);
-  // Side plank (3 Nov 2026): one thing at a time. The hold builds first, 5 seconds more than the same set and
-  // side last time with the same dips, until 45 s; then the dips go up one a time (to the top of the range)
-  // with the hold kept at 45 s. After a stage change the dips start again at the bottom.
+  // Side plank: the hold builds to 45 s first, then the dips (3 Nov 2026).
   const holdsHere = item.scheme.t === 'stage' && !!item.scheme.hold;
-  const sameStage = !!last && last.level === item.level;
-  const holdBuilt = last?.holdSec == null || last.holdSec >= HOLD_CAP;
-  const aimReps = holdsHere && last && sameStage && item.scheme.t === 'stage' ? Math.min(item.scheme.range[1], Math.max(item.scheme.range[0], last.reps + (holdBuilt ? 1 : 0))) : target.reps;
-  // The hold aim stops growing at 45 s (28 Oct 2026): past that, harder comes from more dips and the next stage.
-  const aimHold = holdsHere && last?.holdSec != null ? Math.min(HOLD_CAP, last.holdSec + (sameStage ? 5 : 0)) : null;
+  const aim = sidePlankAim(item, last, target.reps);
+  const sameStage = aim.sameStage;
+  const aimReps = holdsHere ? aim.reps : target.reps;
+  const aimHold = holdsHere ? aim.hold : null;
   const [reps, setReps] = useState(done ? done.reps : aimReps);
   const [rir, setRir] = useState<number | null>(done ? done.rir : null);
   const [controlled, setControlled] = useState(done ? !!done.controlled : false);

@@ -22,6 +22,9 @@ export type Scheme =
 
 /** In a swap, "leave this exercise out" in place of a replacement. */
 export const DROP = '__drop';
+/** The program session holding the side plank, done after the evening stretches (5 Nov 2026). Logged as its own
+ *  session so its history feeds the stage rule, but it is never a gym session: no check-in, calendar entry or review count. */
+export const MOBILITY = 'mobility';
 
 export interface Exercise {
   name: string; equip: Equip; eachSide?: boolean; plateLoaded?: boolean;

@@ -9,7 +9,7 @@ import { ReadinessCard } from './Gym';
 import { applyDoubleUp, heavyBeforeIntervals, shiftFrom, travelOptions } from './engine/schedule';
 import { autoSwaps, buildPlan, leftOut } from './plan';
 import { buildRun, runAdjustFor } from './runplan';
-import { AppState, currentSpeeds, gymForDate, RunType, SessionLog, SHIFTS, today, update, VIEW_ONLY } from './store';
+import { AppState, currentSpeeds, gymForDate, MOBILITY, RunType, SessionLog, SHIFTS, today, update, VIEW_ONLY } from './store';
 import { AppBar, Dock, Icon, Sheet } from './ui';
 
 export const NAMES: Record<string, string> = {
@@ -303,7 +303,7 @@ export function Calendar({ state, onOpen }: { state: AppState; onOpen: (t: Targe
     setMonth(d.toISOString().slice(0, 7));
   };
   const slotsOn = (d: string) => state.schedule.filter(s => s.date === d && !s.skipped).sort((a, b) => a.order - b.order);
-  const extrasOn = (d: string) => state.sessions.filter(s => s.date === d && s.slotIdx === null);
+  const extrasOn = (d: string) => state.sessions.filter(s => s.date === d && s.slotIdx === null && s.type !== MOBILITY);
   const inStint = (d: string) => state.stints.find(x => d >= x.start && d <= x.end);
   const title = new Date(first + 'T00:00:00').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
   const pickedSlots = slotsOn(picked);

@@ -68,7 +68,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   await a.click('Start warm-up'); await a.click('Start lifting');
   for (let i = 0; i < 2; i++) await a.click('Done');
   await a.click('Finish');
-  check('Thursday: the primer is not counted in the session totals', /EXERCISES\s*0 of 7/.test(await a.text()) && /SETS\s*0/.test(await a.text()), (await a.text()).slice(0, 120));
+  check('Thursday: the primer is not counted in the session totals', /EXERCISES\s*0 of 6/.test(await a.text()) && /SETS\s*0/.test(await a.text()), (await a.text()).slice(0, 120));
   await a.close();
 }
 
@@ -148,7 +148,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const s = (await d.text()).split("TODAY'S EXERCISES")[1];
   const od = ['Single-Leg Romanian Deadlift', 'Dips', 'Lying Leg Curl',   // at FIFO Nordics swap to a lying leg curl (18 Oct)
     'Face Pull', 'Hammer Curl', 'Single-Leg Calf Raise', '45° Back Extension', '45° Lateral Bend'];
-  check('Sunday: order (no pairs); the side plank (back by Dan, 27 Oct 2026) comes last', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && s.lastIndexOf('Side Plank') > s.indexOf(od.at(-1)), s);
+  check('Sunday: order (no pairs); no side plank in the gym (it moved to the evening stretches, 5 Nov 2026)', od.every((n, i) => i === 0 || s.indexOf(od[i - 1]) < s.indexOf(n, s.indexOf(od[i - 1]))) && !/side plank/i.test(s), s);
   await d.close();
 }
 
@@ -167,42 +167,40 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   await up.close();
 }
 
-// 5b. Side plank with hip dips (Dan, 27 Oct 2026): 2 sets per side, then 3, then the top-leg lift; hold time logged
+// 5b. Side plank with hip dips (Dan, 27 Oct 2026): 2 sets per side, then 3, then the top-leg lift; hold time logged.
+// Since 5 Nov 2026 it is done at the end of the evening stretches, carrying on from the gym history.
 {
-  const sp = (sets, reps, level, controlled = true) => Array.from({ length: sets }, (_, i) => i + 1).flatMap(n => ['L', 'R'].map(side => ['side_plank', n, null, typeof reps === 'function' ? reps(n, side) : reps, { side, controlled, level, holdSec: 30 }]));
+  const sp = (sets, reps, level, controlled = true, holdSec = 30) => Array.from({ length: sets }, (_, i) => i + 1).flatMap(n => ['L', 'R'].map(side => ['side_plank', n, null, typeof reps === 'function' ? reps(n, side) : reps, { side, controlled, level, holdSec }]));
   const fri = sets => [{ id: 'a1', type: 'gymA', date: '2026-10-16', week: 1, daysAgo: 2, sets }];
+  const mob = async x => { await x.click('Evening mobility'); return x.text(); };
   const start = await fresh('2026-10-17');
-  const t0 = await start.plan(18, 'Gym D');
-  check('Side plank: last in Gym D, stage 1 = 2 sets of 10–15 plus a hold, each side', /Side Plank with Hip Dips · Stage 1: Hip dips, 2 sets\s*2 × 10–15 \+ hold each side/i.test(t0), t0.slice(-200));
+  const t0 = await mob(start);
+  check('Side plank: at the end of the evening stretches, stage 1 = 2 sets of 10–15 dips plus a hold, each side', /Side Plank with Hip Dips · Stage 1: Hip dips, 2 sets\s*2 × 10–15 dips \+ hold, each side/i.test(t0) && /THEN: SIDE PLANK/i.test(t0), t0.slice(t0.search(/THEN: SIDE PLANK/i), t0.search(/THEN: SIDE PLANK/i) + 300));
   await start.close();
   const two = await fresh('2026-10-17', fri(sp(2, 15, 1)));
-  check('Side plank: 15 on both sets, both sides, controlled -> stage 2, 3 sets', /Stage 2: Hip dips, 3 sets\s*3 × 10–15 \+ hold each side/i.test(await two.plan(18, 'Gym D')));
+  check('Side plank: 15 on both sets, both sides, controlled (in the gym) -> stage 2, 3 sets', /Stage 2: Hip dips, 3 sets\s*3 × 10–15/i.test(await mob(two)));
   await two.close();
   const short = await fresh('2026-10-17', fri(sp(2, (n, side) => (n === 2 && side === 'L' ? 13 : 15), 1)));
-  check('Side plank: one side of one set at 13 -> stays at stage 1', /Stage 1: Hip dips, 2 sets/i.test(await short.plan(18, 'Gym D')));
+  check('Side plank: one side of one set at 13 -> stays at stage 1', /Stage 1: Hip dips, 2 sets/i.test(await mob(short)));
   await short.close();
   const three = await fresh('2026-10-17', fri(sp(3, 15, 2)));
-  check('Side plank: 3 × 15 at stage 2 -> stage 3, the top-leg lift', /Stage 3: Hip dips with top-leg lift\s*3 × 10–15 \+ hold each side/i.test(await three.plan(18, 'Gym D')));
+  check('Side plank: 3 × 15 at stage 2 -> stage 3, the top-leg lift', /Stage 3: Hip dips with top-leg lift\s*3 × 10–15/i.test(await mob(three)));
   await three.close();
-  // Logging a set: the hold box starts at last time's hold on that side, and the seconds are saved
-  const log = await fresh('2026-10-18', fri(sp(2, 12, 1)));   // Sunday: Gym D
-  await log.page.evaluate(() => window.__dev.update(s => { s.sets.find(x => x.exId === 'side_plank' && x.side === 'L' && x.setNo === 1).holdSec = 45; }));
-  await log.click('Start Gym'); await log.click('Start warm-up'); await log.click('Start lifting');
-  for (let i = 0; i < 15 && !(await log.text()).includes('Hold at the end'); i++) await log.click('Next exercise');
-  const st = await log.text();
-  const held = await log.page.evaluate(() => [...document.querySelectorAll('.field')].find(f => f.textContent.includes('Hold at the end'))?.querySelector('input')?.value);
-  check('Side plank set screen: aims one more dip (13) and 5 s more hold, capped at 45 s (last time 45), stage choices shown', held === '45' && st.includes('Aim today: 13 dips, then hold 45 s') && st.includes('45 s is the top') && st.includes('2: Hip dips, 3 sets'), `${held} ${st.slice(0, 200)}`);
-  await log.click('More Hold at the end'); await log.click('More Hold at the end');
-  await log.click('Done');
-  const saved = await log.page.evaluate(() => window.__dev.getState().sets.filter(s => s.exId === 'side_plank' && s.sessionId !== 'a1').map(s => `${s.side}${s.setNo}:${s.reps}+${s.holdSec}s L${s.level}`).join());
-  check('Side plank: the set is saved with the seconds held', saved === 'L1:13+55s L1', saved);
+  // Logging: at the 45 s top the dips go up; below it the hold builds with the same dips (3 Nov 2026)
+  const log = await fresh('2026-10-18', fri(sp(2, 12, 1, true, 45)));
+  const st = await mob(log);
+  check('Side plank aim: last time 12 dips + 45 s -> 13 dips, hold 45 s', st.includes('Aim today: 13 dips, then hold 45 s') && st.includes('45 s is the top'), st.slice(-900));
+  await log.click('Controlled'); await log.click('Log left side');
+  const after = await log.text();
+  const saved = await log.page.evaluate(() => { const s = window.__dev.getState(); const m = s.sessions.filter(x => x.type === 'mobility'); return m.length + ':' + s.sets.filter(x => x.exId === 'side_plank' && x.sessionId === m[0]?.id).map(x => `${x.side}${x.setNo}:${x.reps}+${x.holdSec}s L${x.level}${x.controlled ? ' c' : ''}`).join(); });
+  check('Side plank: the set is saved under one mobility session, then the right side is next', saved === '1:L1:13+45s L1 c' && /Set 1 of 2 · Right side/i.test(after), saved);
+  await log.click('Back'); await log.click('Calendar');
+  const cal = await log.text();
+  check('Side plank: the mobility session is not shown as an extra session on the calendar', !/Evening mobility/i.test(cal.split('FIFO STINTS')[0].split('SHIFT')[1] ?? ''), cal.slice(-400));
   await log.close();
-  // 3 Nov 2026: one thing at a time. Below 45 s the hold builds with the same dips.
   const hold = await fresh('2026-10-18', fri(sp(2, 12, 1)));
-  await hold.click('Start Gym'); await hold.click('Start warm-up'); await hold.click('Start lifting');
-  for (let i = 0; i < 15 && !(await hold.text()).includes('Hold at the end'); i++) await hold.click('Next exercise');
-  const ht = await hold.text();
-  check('Side plank set screen: last time 12 dips + 30 s -> same 12 dips, hold 35 s', ht.includes('Aim today: 12 dips, then hold 35 s') && ht.includes('same dips, 5 s more hold'), ht.slice(0, 300));
+  const ht = await mob(hold);
+  check('Side plank aim: last time 12 dips + 30 s -> same 12 dips, hold 35 s', ht.includes('Aim today: 12 dips, then hold 35 s') && ht.includes('same dips, 5 s more hold'), ht.slice(-900));
   await hold.close();
 }
 
