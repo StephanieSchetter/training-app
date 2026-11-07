@@ -79,6 +79,31 @@ def day_record(g, d):
     return rec if any(v is not None for k, v in rec.items() if k != "date") else None
 
 
+def pick(src, *keys, nd=1):
+    """First numeric value among keys, rounded; None when the watch didn't record it."""
+    for k in keys:
+        v = src.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return round(v, nd)
+    return None
+
+
+def dynamics(src):
+    """Running form (8 Nov 2026, for the coach's reviews only): cadence, stride length, bounce (vertical
+    oscillation and ratio) and ground contact. Bounce and ground contact need a watch or strap that records them."""
+    rec = {
+        "cadence": pick(src, "averageRunCadence", "averageRunningCadenceInStepsPerMinute"),
+        "strideCm": pick(src, "strideLength", "avgStrideLength"),
+        "vertOscCm": pick(src, "verticalOscillation", "avgVerticalOscillation"),
+        "vertRatio": pick(src, "verticalRatio", "avgVerticalRatio"),
+        "gctMs": pick(src, "groundContactTime", "avgGroundContactTime", nd=0),
+        "gctBalance": pick(src, "groundContactBalanceLeft", "avgGroundContactBalance"),
+        "power": pick(src, "averagePower", "avgPower", nd=0),
+        "elevGainM": pick(src, "elevationGain", nd=0),
+    }
+    return {k: v for k, v in rec.items() if v is not None}
+
+
 def activity_record(g, a):
     key = (a.get("activityType") or {}).get("typeKey", "")
     kind = "run" if "running" in key else "strength" if key == "strength_training" else None
@@ -87,13 +112,14 @@ def activity_record(g, a):
     laps = []
     if kind == "run":
         for lap in (g.get_activity_splits(a["activityId"]) or {}).get("lapDTOs") or []:
-            laps.append({"sec": round(lap.get("duration") or 0, 1), "km": round((lap.get("distance") or 0) / 1000, 3), "avgHr": lap.get("averageHR")})
+            laps.append({"sec": round(lap.get("duration") or 0, 1), "km": round((lap.get("distance") or 0) / 1000, 3), "avgHr": lap.get("averageHR"), **dynamics(lap)})
     start = a.get("startTimeLocal") or ""
     return {
         "id": a["activityId"], "type": kind, "typeKey": key, "startLocal": start, "date": start[:10],
         "durationSec": round(a.get("duration") or 0), "avgHr": a.get("averageHR"), "maxHr": a.get("maxHR"),
         "trainingLoad": round(a["activityTrainingLoad"], 1) if a.get("activityTrainingLoad") is not None else None,
         "distanceKm": round((a.get("distance") or 0) / 1000, 3), "laps": laps,
+        **(dynamics(a) if kind == "run" else {}),
     }
 
 

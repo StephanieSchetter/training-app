@@ -181,11 +181,13 @@ export interface GarminDay {
   /** From 14 Oct 2026: steps, Garmin's calorie-burn estimate, and calories eaten as logged in MyFitnessPal (linked to Garmin). */
   steps?: number | null; kcalOut?: number | null; kcalActive?: number | null; kcalBmr?: number | null; kcalIn?: number | null;
 }
-export interface GarminActivity {
+export interface GarminActivity extends RunForm {
   id: number; type: 'run' | 'strength'; startLocal: string; date: string; durationSec: number;
   avgHr: number | null; maxHr: number | null; trainingLoad: number | null; distanceKm: number;
-  laps: { sec: number; km: number; avgHr: number | null }[];
+  laps: ({ sec: number; km: number; avgHr: number | null } & RunForm)[];
 }
+/** Running form from 8 Nov 2026, kept for the coach's reviews (not shown in the app). Missing when the watch didn't record it. */
+export interface RunForm { cadence?: number; strideCm?: number; vertOscCm?: number; vertRatio?: number; gctMs?: number; gctBalance?: number; power?: number; elevGainM?: number }
 export interface GarminStatus { ok: boolean; lastSync?: string; lastAttempt?: string; error?: string | null }
 
 export interface AppState {
