@@ -450,7 +450,11 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     // progression carries on from whatever was actually logged.
     // Only for sessions after the review it was agreed at.
     const agreed = program.coachWeights?.filter(c => c.ex === ex && (!c.gym || c.gym === gym.id) && session.date > c.from).at(-1);
-    if (agreed && scheme.t !== 'dips' && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || p.session.gymId === agreed.gym))) {
+    // 10 Nov 2026: an agreed weight already lifted last time is spent; it never pulls the reps back to the bottom.
+    const lastAt = past.filter(p => !agreed?.gym || !p.session.gymId || p.session.gymId === agreed.gym).at(-1);
+    const lastTop = lastAt?.sets.find(s => !s.rampUp && !s.extra)?.weight ?? null;
+    const spent = !!agreed && lastTop != null && roundNearest(lastTop, equip, gym, ex) === roundNearest(agreed.kg, equip, gym, ex);
+    if (agreed && !spent && scheme.t !== 'dips' && !deload && equip !== 'bodyweight' && targets.length && !past.some(p => p.session.date > agreed.from && (!agreed.gym || !p.session.gymId || p.session.gymId === agreed.gym))) {
       const w = roundNearest(agreed.kg, equip, gym, ex);
       const before = earned ?? targets;
       // A fresh agreed top set aims for the scheme's own reps, not the "one more rep" carried from last time.
