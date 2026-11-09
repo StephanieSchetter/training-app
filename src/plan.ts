@@ -273,6 +273,8 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
             }
           }
         }
+        // The top set's "one more rep" shows on screen too (9 Nov 2026), not only the scheme's own number.
+        if (targets[0] && targets[0].reps > scheme.reps[0]) repsLabel[0] = String(targets[0].reps);
         break;
       }
       case 'bwload': {
