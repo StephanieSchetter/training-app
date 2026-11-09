@@ -13,7 +13,7 @@ const RIRS = ['0', '1', '2', '3', '4+'];
 const fmtKg = (w: number | null) => (w === null ? '—' : `${w} kg`);
 const sideName = (s?: 'L' | 'R') => (s === 'L' ? 'Left' : s === 'R' ? 'Right' : '');
 const setText = (s: SetLog) => `${s.weight != null ? `${s.weight} kg × ` : ''}${s.reps}${s.holdSec != null ? ` + ${s.holdSec} s hold` : ''}${s.rir != null ? ` · RIR ${RIRS[s.rir]}` : ''}`;
-export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
+export const schemeText = (p: PlanItem) => (p.scheme.t === 'rpt' || new Set(p.repsLabel).size > 1 ? `${p.targets.length} sets · ${p.repsLabel.join(' / ')}` : `${p.targets.length} × ${p.repsLabel[0] ?? ''}`) + (p.info.eachSide ? ' each side' : '');
 
 export function useWakeLock() {
   useEffect(() => {

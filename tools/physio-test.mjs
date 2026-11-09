@@ -160,7 +160,7 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   check('Back extension: 3 × 12 all at RIR 3 or 4+ on Friday -> 2.5 kg on Sunday', /45° Back Extension \(weighted\)\s*3 × 10–12\s*2\.5 kg/.test(await easy.plan(18, 'Gym D')), (await easy.plan(18, 'Gym D')).slice(-160));
   await easy.close();
   const hard = await fresh('2026-10-17', fri(be([3, 3, 2])));
-  check('Back extension: one set at RIR 2 -> stays bodyweight', /45° Back Extension\s*3 × 10–12\s*Bodyweight/.test(await hard.plan(18, 'Gym D')));
+  check('Back extension: one set at RIR 2 -> stays bodyweight (aiming 12 again, 9 Nov 2026)', /45° Back Extension\s*3 × 12\s*Bodyweight/.test(await hard.plan(18, 'Gym D')));
   await hard.close();
   const up = await fresh('2026-10-17', fri(be([2, 2, 2], 2.5)));
   check('Back extension weighted: all sets at 12 -> +2.5 kg to 5', /45° Back Extension \(weighted\)\s*3 × 10–12\s*5 kg/.test(await up.plan(18, 'Gym D')));
@@ -230,6 +230,19 @@ const wk1C = (check, sets = dl(60)) => ({ id: 'c1', type: 'gymC', date: '2026-10
   const loose = await fresh('2026-10-17', fri(lb(12, false)));
   check('Lateral bend: 12s but not ticked controlled -> stays at stage 1', (await loose.plan(18, 'Gym D')).includes('Stage 1: Hands by sides'));
   await loose.close();
+  // 9 Nov 2026: one more rep per set at the same stage; after stage 3 at 12 everywhere, a weight hugged to the chest
+  const elevenL = await fresh('2026-10-17', fri(lb((n, side) => (n === 3 && side === 'R' ? 10 : 11))));
+  const el = await elevenL.plan(18, 'Gym D');
+  check('Lateral bend: 11, 11, 10 last time -> aims 12 / 12 / 11 at the same stage', /Stage 1: Hands by sides\s*3 sets · 12 \/ 12 \/ 11/.test(el), el.slice(-400));
+  await elevenL.close();
+  const top = await fresh('2026-10-17', fri(lb(12, true, 3)));
+  const tp = await top.plan(18, 'Gym D');
+  check('Lateral bend: stage 3 at 12 everywhere -> weighted, 5 kg hugged to the chest', /Lateral Bend \(weighted, hug the weight to your chest\)\s*3 × 10–12 each side\s*5 kg/i.test(tp), tp.slice(-400));
+  await top.close();
+  const wtd = await fresh('2026-10-17', fri([1, 2, 3].flatMap(n => ['L', 'R'].map(side => ['lateral_bend_45', n, 5, n === 1 ? 12 : 11, { side, controlled: true, level: 3 }]))));
+  const wt = await wtd.plan(18, 'Gym D');
+  check('Weighted lateral bend: 12, 11, 11 at 5 kg -> same 5 kg, aims 12 / 12 / 12', /hug the weight to your chest\)\s*3 × 12 each side\s*5 kg/i.test(wt), wt.slice(-400));
+  await wtd.close();
   // 4. Back-flare week: lateral bend drops one stage, back extension holds the last load that didn't aggravate
   const flare = await fresh('2026-10-17', fri([...lb(12), ...[1, 2, 3].map(n => ['back_ext_45', n, 5, 12, { rir: 1 }])]),
     () => window.__dev.update(s => { s.tempSwaps.push({ id: 'f', kind: 'back-flare', week: 1, createdAt: Date.now() }); }));

@@ -56,6 +56,16 @@ describe('gym progression', () => {
     expect(suggestRpt([6, 8, 10], [{ gymId: 'adelaide', weight: 22.5, reps: [8] }], ctx).sets[0].weight).toBe(24);
   });
 
+  it('straight sets at the same weight aim one more rep per set, within the range (9 Nov 2026)', () => {
+    const ctx: LiftCtx = { exId: 'hammer_curl', equip: 'dumbbell', gym: adelaide, week: 3 };
+    const s = suggestStraight(3, [10, 12], [{ gymId: 'adelaide', weight: 17.5, reps: [12, 11, 8] }], ctx);
+    expect(s.sets.map(x => [x.weight, x.reps])).toEqual([[17.5, 12], [17.5, 12], [17.5, 10]]);
+    expect(s.reason).toMatch(/one more rep/);
+    const up = suggestStraight(3, [10, 12], [{ gymId: 'adelaide', weight: 17.5, reps: [12, 11, 10] }], ctx);
+    expect(up.sets.map(x => x.reps)).toEqual([10, 10, 10]);
+    expect(up.sets[0].weight).toBeGreaterThan(17.5);
+  });
+
   it('5: leg curl 35 in Adelaide, first time in PH -> no suggestion, asks for step', () => {
     const ctx: LiftCtx = { exId: 'leg_curl', equip: 'machine', gym: fifo, week: 2 };
     const s = suggestStraight(4, [10, 12], [{ gymId: 'adelaide', weight: 35, reps: [12, 12, 12, 12] }], ctx);

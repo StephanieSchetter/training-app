@@ -166,6 +166,16 @@ export function lastSet(state: AppState, exId: string, setNo: number, side: stri
 
 const range = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : `${r[0]}–${r[1]}`);
 
+/** Progressive overload on every exercise (Brad, 9 Nov 2026): each set aims for one more rep than the same set
+ *  last time (the lower side for each-side moves), kept within the range. No comparable last time -> the bottom. */
+function moreReps(last: { sets: SetLog[] } | undefined, n: number, r: [number, number]): number[] {
+  return Array.from({ length: n }, (_, i) => {
+    const done = last?.sets.filter(x => x.setNo === i + 1 && !x.rampUp && !x.extra) ?? [];
+    return done.length ? Math.min(r[1], Math.max(r[0], Math.min(...done.map(x => x.reps)) + 1)) : r[0];
+  });
+}
+const aimLabel = (reps: number, r: [number, number]) => (reps > r[0] ? String(reps) : range(r));
+
 export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
   const program = state.program!;
   const gym: GymProfile = state.profiles.find(p => p.id === session.gymId)!;
@@ -204,6 +214,8 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     // Back-off weights earned last time, before they are stepped under this session's top set.
     let earned: SetTarget[] | null = null;
     let reason = '';
+    // The scheme the session screen works with, when it differs from the program's (weighted lateral bend).
+    let shown: typeof scheme | undefined;
     const ctx = (): LiftCtx => ({ exId: ex, equip, gym, week });
 
     switch (scheme.t) {
@@ -281,8 +293,14 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           reason = loaded.length ? s.reason : '3 × 12 felt easy: now holding a plate';
         }
         if (weight) { equip = 'added'; title = `${info.name} (weighted)`; }
-        targets = Array.from({ length: sets }, () => ({ weight, reps: scheme.range[0] }));
-        repsLabel = targets.map(() => range((scheme as { range: [number, number] }).range));
+        const r = scheme.range;
+        // Same load as last time -> one more rep per set; a new load starts at the bottom of the range.
+        const prevBw = steady.at(-1);
+        const prevW = prevBw?.sets.find(x => !x.rampUp && !x.extra)?.weight ?? null;
+        const aims = !flare && prevW === weight ? moreReps(prevBw, sets, r) : Array(sets).fill(r[0]);
+        targets = aims.map(reps => ({ weight, reps }));
+        repsLabel = aims.map(x => aimLabel(x, r));
+        if (!reason && !flare && prevW === weight && aims.some(x => x > r[0])) reason = 'Same load, one more rep on each set';
         break;
       }
       case 'stage': {
@@ -290,18 +308,37 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         const names = stageNames(program, sc);
         const setsAt = (n: number) => sc.stages?.[n - 1]?.sets ?? sc.sets;
         let stage = 1;
+        let topDone = false;
         for (const p of past) {
           if (easedOff(state, p.session)) continue; // an eased-off session never counts towards moving up
           const at: number = p.sets[0]?.level ?? stage;
           // Brad can move himself up a stage on the day (27 Oct 2026); the logged stage then stands.
           if (at > stage) stage = Math.min(at, names.length);
           const rows = p.sets.filter(s => !s.rampUp && !s.extra).map(s => ({ setNo: s.setNo, side: s.side, reps: s.reps, controlled: !!s.controlled }));
-          if (at === stage && stage < names.length && lateralBendStageUp(rows, setsAt(at), sc.range[1])) stage++;
+          const passed = lateralBendStageUp(rows, setsAt(at), sc.range[1]);
+          if (at === stage && stage < names.length && passed) stage++;
+          else if (at === names.length && stage === names.length && passed) topDone = true;
+        }
+        // Lateral bend after the last stage (Brad, 9 Nov 2026): a plate or dumbbell hugged to the chest, 5 kg at
+        // first, then straight sets that go up 2.5 kg once every set, both sides, reaches the top of the range.
+        const loaded = past.filter(p => !easedOff(state, p.session) && p.sets.some(s => s.weight));
+        if (!sc.hold && !flare && (topDone || loaded.length)) {
+          const sets = setsAt(names.length);
+          equip = 'added';
+          const s = loaded.length ? suggestStraight(sets, sc.range, loaded.map(p => p.result), { ...ctx(), equip, week: Math.max(week, 2) }, true) : null;
+          targets = s ? s.sets : Array.from({ length: sets }, () => ({ weight: 5, reps: sc.range[0] }));
+          reason = s ? s.reason : `Stage ${names.length} done at ${sc.range[1]} on every set: now holding a weight`;
+          title = `${info.name} (weighted, hug the weight to your chest)`;
+          shown = { t: 'straight', sets, range: sc.range };
+          repsLabel = targets.map(t => (t.reps > sc.range[0] ? String(t.reps) : range(sc.range)));
+          break;
         }
         level = flare ? Math.max(1, stage - 1) : stage;
         title = `${info.name} · Stage ${level}: ${names[level - 1]}`;
-        targets = Array.from({ length: setsAt(level) }, () => ({ weight: null, reps: sc.range[0] }));
-        repsLabel = targets.map(() => range(sc.range) + (sc.hold ? ' + hold' : ''));
+        const atLevel = sc.hold ? undefined : past.filter(p => !easedOff(state, p.session) && (p.sets[0]?.level ?? 1) === level).at(-1);
+        const stAims = moreReps(atLevel, setsAt(level), sc.range);
+        targets = stAims.map(reps => ({ weight: null, reps }));
+        repsLabel = stAims.map(x => (sc.hold ? range(sc.range) : aimLabel(x, sc.range)) + (sc.hold ? ' + hold' : ''));
         reason = flare && stage > 1 ? 'Back-flare week: one stage easier' : '';
         break;
       }
@@ -315,7 +352,8 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           targets = s.sets; reason = s.reason;
         }
         const unit = scheme.t === 'fixed' && scheme.unit ? ` ${scheme.unit}` : '';
-        repsLabel = targets.map(() => range(r) + unit);
+        // A set aiming above the bottom of the range shows that aim (9 Nov 2026); otherwise the range.
+        repsLabel = targets.map(t => (t.reps > r[0] ? String(t.reps) : range(r)) + unit);
         break;
       }
       case 'pullup': {
@@ -350,8 +388,9 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
         }
         const cur = levels[level - 1];
         title = `Level ${level}: ${cur.name}`;
-        targets = Array.from({ length: cur.sets }, () => ({ weight: null, reps: cur.range[0] }));
-        repsLabel = targets.map(() => range(cur.range));
+        const lrAims = moreReps(past.filter(p => (p.sets[0]?.level ?? 1) === level).at(-1), cur.sets, cur.range);
+        targets = lrAims.map(reps => ({ weight: null, reps }));
+        repsLabel = lrAims.map(x => aimLabel(x, cur.range));
         break;
       }
       case 'dips': {
@@ -375,8 +414,10 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           repsLabel = sc.map(String);
           title = 'Dips (weighted)';
         } else {
-          targets = Array.from({ length: scheme.sets }, () => ({ weight: null, reps: (scheme as { range: [number, number] }).range[0] }));
-          repsLabel = targets.map(() => range((scheme as { range: [number, number] }).range));
+          const dr = (scheme as { range: [number, number] }).range;
+          const dAims = moreReps(bw.at(-1), scheme.sets, dr);
+          targets = dAims.map(reps => ({ weight: null, reps }));
+          repsLabel = dAims.map(x => aimLabel(x, dr));
         }
         break;
       }
@@ -387,8 +428,10 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           if (at && li < NORDIC_LEVELS.length - 1 && nordicLevelUp(p.result.reps)) li++;
         }
         assist = NORDIC_LEVELS[li];
-        targets = Array.from({ length: scheme.sets }, () => ({ weight: null, reps: (scheme as { range: [number, number] }).range[0] }));
-        repsLabel = targets.map(() => range((scheme as { range: [number, number] }).range));
+        const nr = (scheme as { range: [number, number] }).range;
+        const nAims = moreReps(past.filter(p => p.sets.every(s => s.assist === assist)).at(-1), scheme.sets, nr);
+        targets = nAims.map(reps => ({ weight: null, reps }));
+        repsLabel = nAims.map(x => aimLabel(x, nr));
         break;
       }
     }
@@ -483,7 +526,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     const ramp = !rampable ? [] : rampSets(top, isMain ? (mainLiftsSoFar === 0 ? 'first' : 'main') : 'other', ctx());
     if (isMain && usesWeight) mainLiftsSoFar++;
     return {
-      plannedEx: item.ex, ex, info, title, scheme, pair: item.pair, before: item.before,
+      plannedEx: item.ex, ex, info, title, scheme: shown ?? scheme, pair: item.pair, before: item.before,
       swapLabel: swapped ? `Swapped from ${program.exercises[item.ex].name}` : undefined,
       equip, usesWeight, targets, repsLabel, reason,
       rest: state.restOverrides[ex] ?? (isMain ? 180 : 90),

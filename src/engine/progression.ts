@@ -136,10 +136,16 @@ export function suggestStraight(sets: number, range: [number, number], history: 
   const weight = allTop
     ? oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId)
     : roundNearest(last.weight, ctx.equip, ctx.gym, ctx.exId);
+  // Brad, 9 Nov 2026: at the same weight each set aims for one more rep than that set last time (within the
+  // range), so the screen always asks for progress; after a step up every set starts at the bottom of the range.
+  const more = !allTop && weight === last.weight && range[0] < range[1];
+  const reps = more ? targets.map((lo, i) => Math.min(range[1], Math.max(lo, (last.reps[i] ?? lo - 1) + 1))) : targets;
+  const rule = everySetAtTop ? `${range[1]} on every set` : `${range[1]} on the first set and ${range[0]}+ on the rest`;
   return {
     kind: 'weights',
-    sets: targets.map(reps => ({ weight, reps })),
-    reason: !allTop ? 'Same weight' : everySetAtTop || range[0] === range[1] ? 'All sets hit the top: one step up' : 'First set hit the top and the rest stayed in range: one step up',
+    sets: reps.map(r => ({ weight, reps: r })),
+    reason: !allTop ? (more ? `Same weight, one more rep on each set (the weight goes up at ${rule})` : 'Same weight')
+      : everySetAtTop || range[0] === range[1] ? 'All sets hit the top: one step up' : 'First set hit the top and the rest stayed in range: one step up',
   };
 }
 
