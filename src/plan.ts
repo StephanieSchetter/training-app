@@ -248,12 +248,20 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
               const reps = Math.min(...done.map(x => x.reps));
               const rir = Math.min(...done.map(x => x.rir ?? 0));
               const want = scheme.reps[i];
-              if (reps < want) return t;
+              const same = roundNearest(w, equip, gym, ex);
+              // 10 Nov 2026 (Brad, iso row: 30 x 10 and 25 x 10 last time, then asked for 35 x 10 and 30 x 12):
+              // a back-off set short of its target stays at the weight it was done at, for one more rep. The
+              // 10%-drop formula never pushes it above what was actually managed.
+              if (reps < want) {
+                const weight = Math.min(top, same);
+                const aim = weight === w ? reps + 1 : want;
+                repsLabel[i] = String(aim);
+                return { ...t, weight, reps: aim };
+              }
               // 27 Oct 2026: back-off sets progress like the top set. At the top of their range (2 over the
               // target) or with 4+ in reserve, one step up; otherwise the same weight for one more rep.
               const up = reps >= want + 2 || rir >= 4;
-              const same = roundNearest(w, equip, gym, ex);
-              const weight = Math.min(top, Math.max(t.weight, up ? oneStepUp(w, equip, gym, ex) : same));
+              const weight = Math.min(top, up ? oneStepUp(w, equip, gym, ex) : same);
               // One more rep only at exactly the weight done last time. A different weight (e.g. 16 kg at Port
               // Hedland rounding to 15 in Adelaide) aims for the set's own target (28 Oct 2026).
               const aim = weight === w ? Math.min(want + 2, reps + 1) : want;
