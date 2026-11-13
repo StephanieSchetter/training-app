@@ -2,7 +2,11 @@
 
 export type SessionType = 'easy' | 'gymB' | 'intervals' | 'gymC' | 'gymA' | 'threshold' | 'gymD';
 
-export const WEEK_ORDER: SessionType[] = ['easy', 'gymB', 'intervals', 'gymC', 'gymA', 'threshold', 'gymD'];
+// 14 Nov 2026 (Brad): the easy run moved from before Gym B to between C and A, so each back-heavy day
+// (C deadlift, A hip thrust and swings, D single-leg RDL) has a day without heavy lifting after it.
+export const WEEK_ORDER: SessionType[] = ['gymB', 'intervals', 'gymC', 'easy', 'gymA', 'threshold', 'gymD'];
+/** Block 1 was built in the original order; its saved schedule was re-ordered from week 5 by hand. */
+export const BLOCK1_ORDER: SessionType[] = ['easy', 'gymB', 'intervals', 'gymC', 'gymA', 'threshold', 'gymD'];
 
 export interface Slot {
   idx: number;
@@ -22,10 +26,10 @@ export function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function buildSchedule(start: string, weeks = 8): Slot[] {
+export function buildSchedule(start: string, weeks = 8, order: SessionType[] = WEEK_ORDER): Slot[] {
   const slots: Slot[] = [];
   for (let i = 0; i < weeks * 7; i++) {
-    slots.push({ idx: i, week: Math.floor(i / 7) + 1, type: WEEK_ORDER[i % 7], date: addDays(start, i), order: 1 });
+    slots.push({ idx: i, week: Math.floor(i / 7) + 1, type: order[i % 7], date: addDays(start, i), order: 1 });
   }
   return slots;
 }

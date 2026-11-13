@@ -4,7 +4,7 @@ import { GymProfile, nudge, oneStepUp, roundDown, roundNearest } from './weights
 import { backExtensionGoWeighted, lateralBendStageUp } from './progression';
 import { rampSets } from './progression';
 import { deloadSetCount, LiftCtx, nextBlockStart, pullupsGoWeighted, PULLUP_WEIGHTED, reduceTenPercent, suggestRpt, suggestStraight } from './progression';
-import { applyDoubleUp, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
+import { applyDoubleUp, BLOCK1_ORDER, buildSchedule, heavyBeforeIntervals, shiftFrom, travelOptions } from './schedule';
 import { matchActivity, matchLaps, matchRepLaps } from './garmin';
 import { EnergyDay, estimateMaintenance, targets, trendWeights } from './energy';
 import { easyPaceAdvice, hrBetween, isComfortableEasy, isHardEasy, steadyHr } from './coach';
@@ -129,7 +129,7 @@ describe('gym progression', () => {
 });
 
 describe('schedule', () => {
-  const block = buildSchedule('2026-10-12');
+  const block = buildSchedule('2026-10-12', 8, BLOCK1_ORDER);
   const on = (slots: typeof block, date: string) => slots.filter(s => s.date === date).sort((a, b) => a.order - b.order).map(s => s.type);
 
   it('7: missed Thursday pushes Gym C to Friday and everything after', () => {
@@ -430,5 +430,14 @@ describe('coach: reading an easy run from its laps', () => {
     const loggedLate = new Date(2026, 9, 12, 7, 30).getTime();
     expect(matchActivity(acts, '2026-10-12', 'run', loggedLate)?.id).toBe(2);
     expect(matchActivity(acts, '2026-10-12', 'run', loggedLate, 'longest')?.id).toBe(1);
+  });
+});
+
+describe('week order (14 Nov 2026)', () => {
+  it('no two back-heavy sessions (C, A, D) on consecutive days, and Gym B still the day before intervals', () => {
+    const s = buildSchedule('2027-01-04', 2);
+    const heavy = (t: string) => t === 'gymC' || t === 'gymA' || t === 'gymD';
+    for (let i = 1; i < s.length; i++) expect(heavy(s[i].type) && heavy(s[i - 1].type)).toBe(false);
+    for (let i = 1; i < s.length; i++) if (s[i].type === 'intervals') expect(s[i - 1].type).toBe('gymB');
   });
 });

@@ -2,7 +2,7 @@
 import { get, set } from 'idb-keyval';
 import { useSyncExternalStore } from 'react';
 import type { Equip, GymProfile } from './engine/weights';
-import { applyDoubleUp, buildSchedule, Slot } from './engine/schedule';
+import { applyDoubleUp, BLOCK1_ORDER, buildSchedule, Slot } from './engine/schedule';
 
 export type Scheme =
   | { t: 'rpt'; reps: number[] }
@@ -261,7 +261,7 @@ export function loadProgram(s: AppState, p: Program) {
   s.program = tidyProgram(p);
   s.stints = p.stints;
   s.days = { ...p.days };
-  let sched = buildSchedule(p.start, p.weeks);
+  let sched = buildSchedule(p.start, p.weeks, p.block === 1 ? BLOCK1_ORDER : undefined);
   for (const d of p.doubleUps) sched = applyDoubleUp(sched, d);
   s.schedule = sched;
 }
