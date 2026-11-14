@@ -441,3 +441,26 @@ describe('week order (14 Nov 2026)', () => {
     for (let i = 1; i < s.length; i++) if (s[i].type === 'intervals') expect(s[i - 1].type).toBe('gymB');
   });
 });
+
+describe('step size (14 Nov 2026: appropriate jumps)', () => {
+  const c = (exId: string, equip: LiftCtx['equip'], rirTarget?: number): LiftCtx => ({ exId, equip, gym: adelaide, week: 5, rirTarget });
+  it('hip thrust 130 x 8 with 2 in reserve -> about 137.5 for 6 at 1-2 in reserve, not 132.5', () => {
+    const s = suggestRpt([6, 8, 10], [{ gymId: 'adelaide', weight: 130, reps: [8, 10, 12], topRir: 2 }], c('hip_thrust', 'barbell_heavy', 1.5));
+    expect(s.sets[0].weight).toBe(137.5);
+    expect(s.reason).toMatch(/bigger step/);
+  });
+  it('calf raise 130 x 15 on every set with 3 in reserve -> 142.5 for 12', () => {
+    const s = suggestStraight(3, [12, 15], [{ gymId: 'adelaide', weight: 130, reps: [15, 15, 15], topRir: 3 }], c('lp_calf', 'barbell_heavy', 1.5));
+    expect(s.sets[0].weight).toBe(142.5);
+  });
+  it('never more than 10% at once; no RIR logged -> smallest step', () => {
+    const big = suggestRpt([6, 8, 10], [{ gymId: 'adelaide', weight: 100, reps: [12, 10, 10], topRir: 4 }], c('hip_thrust', 'barbell_heavy', 1));
+    expect(big.sets[0].weight).toBeLessThanOrEqual(110);
+    const none = suggestRpt([6, 8, 10], [{ gymId: 'adelaide', weight: 130, reps: [8, 10, 12], topRir: null }], c('hip_thrust', 'barbell_heavy', 1.5));
+    expect(none.sets[0].weight).toBe(oneStepUp(130, 'barbell_heavy', adelaide, 'hip_thrust'));
+  });
+  it('a top set that only just made the target still moves one small step', () => {
+    const s = suggestRpt([6, 8, 10], [{ gymId: 'adelaide', weight: 80, reps: [8, 9, 12], topRir: 0 }], c('incline_press', 'barbell', 1.5));
+    expect(s.sets[0].weight).toBe(82.5);
+  });
+});

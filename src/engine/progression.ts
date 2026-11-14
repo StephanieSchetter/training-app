@@ -1,5 +1,5 @@
 // Gym progression rules (spec section 6). Suggestions go purely by reps.
-import { Equip, GymProfile, gridStep, nudge, oneStepUp, roundDown, roundNearest } from './weights';
+import { Equip, GymProfile, gridStep, nudge, oneStepUp as smallestStepUp, roundDown, roundNearest } from './weights';
 
 export interface LiftCtx {
   exId: string;
@@ -8,7 +8,31 @@ export interface LiftCtx {
   gym: GymProfile;
   /** Week of the block for the next session (1-8). */
   week: number;
+  /** Reps in reserve aimed for next session (the week's target, e.g. "1–2" -> 1.5). Unset: smallest steps only. */
+  rirTarget?: number;
 }
+
+/** "1–2" -> 1.5, "3" -> 3, "4+" -> 4. */
+export function parseRir(s: string | undefined): number | undefined {
+  const n = (s ?? '').match(/\d+(\.\d+)?/g)?.map(Number);
+  return n?.length ? n.reduce((a, b) => a + b, 0) / n.length : undefined;
+}
+
+/**
+ * How far a lift goes up once it has earned a step (Brad, 14 Nov 2026: "we need to make appropriate jumps").
+ * From what was done (weight x reps with reps in reserve) estimate a one-rep max (Epley, counting the reps left),
+ * then take the heaviest weight that should give the target reps at next session's reps-in-reserve target.
+ * Never less than the smallest step, never more than 10% at once. Without a logged RIR, or for added-load
+ * and bodyweight work, it stays the smallest step.
+ */
+export function sizedStep(w: number, reps: number, rir: number | null | undefined, targetReps: number, ctx: LiftCtx): number {
+  const up = smallestStepUp(w, ctx.equip, ctx.gym, ctx.exId);
+  if (rir == null || ctx.rirTarget == null || ctx.equip === 'added' || ctx.equip === 'bodyweight') return up;
+  const e1rm = w * (1 + (reps + Math.min(rir, 4)) / 30);
+  const ideal = Math.min(e1rm / (1 + (targetReps + ctx.rirTarget) / 30), w * 1.1);
+  return Math.max(up, roundDown(ideal, ctx.equip, ctx.gym, ctx.exId));
+}
+const oneStepUp = smallestStepUp;
 
 /** One past session's result for a lift. For RPT lifts only the top set matters. */
 export interface PastResult {
@@ -102,10 +126,10 @@ export function suggestRpt(scheme: number[], history: PastResult[], ctx: LiftCtx
   const out = (top: number, topReps: number, reason: string): Suggestion =>
     ({ kind: 'weights', sets: rptSets(top, scheme, topReps, ctx), reason });
 
-  if (reps >= b) return out(oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId), a, 'Hit the top of the range: one step up');
+  if (reps >= b) { const w = sizedStep(last.weight, reps, last.topRir, a, ctx); return out(w, a, w > oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId) ? 'Hit the top of the range with reps to spare: a bigger step up' : 'Hit the top of the range: one step up'); }
   // Agreed 10 Oct 2026: a top set that reached its target with 4+ in reserve was far too light, so go up now
   // rather than adding a rep a week. The deadlift never gets here: its history carries no topRir.
-  if (reps >= a && (last.topRir ?? 0) >= 4) return out(oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId), a, 'Felt very easy last time (4+ in reserve): one step up');
+  if (reps >= a && (last.topRir ?? 0) >= 4) return out(sizedStep(last.weight, reps, last.topRir, a, ctx), a, 'Felt very easy last time (4+ in reserve): up a step sized to it');
   if (reps >= a) return out(r(last.weight), Math.min(reps + 1, b), 'Same weight, aim for one more rep');
   if (last.excused) return out(r(last.weight), a, 'Excused miss: same weight');
 
@@ -134,8 +158,9 @@ export function suggestStraight(sets: number, range: [number, number], history: 
   if (ctx.week === 1 || !last) return findLoad(history, ctx, targets);
   const allTop = last.reps.length >= sets && last.reps[0] >= range[1] && last.reps.every(x => x >= (everySetAtTop ? range[1] : range[0]));
   const weight = allTop
-    ? oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId)
+    ? sizedStep(last.weight, last.reps[0], last.topRir, range[0], ctx)
     : roundNearest(last.weight, ctx.equip, ctx.gym, ctx.exId);
+  const big = allTop && weight > oneStepUp(last.weight, ctx.equip, ctx.gym, ctx.exId);
   // Brad, 9 Nov 2026: at the same weight each set aims for one more rep than that set last time (within the
   // range), so the screen always asks for progress; after a step up every set starts at the bottom of the range.
   const more = !allTop && weight === last.weight && range[0] < range[1];
@@ -145,6 +170,7 @@ export function suggestStraight(sets: number, range: [number, number], history: 
     kind: 'weights',
     sets: reps.map(r => ({ weight, reps: r })),
     reason: !allTop ? (more ? `Same weight, one more rep on each set (the weight goes up at ${rule})` : 'Same weight')
+      : big ? 'Hit the top with reps to spare: a bigger step up'
       : everySetAtTop || range[0] === range[1] ? 'All sets hit the top: one step up' : 'First set hit the top and the rest stayed in range: one step up',
   };
 }

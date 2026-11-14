@@ -3,7 +3,7 @@ import type { Equip, GymProfile } from './engine/weights';
 import { gridStep, nudge, oneStepUp, roundNearest } from './engine/weights';
 import {
   backExtensionGoWeighted, deloadSetCount, rampSets, dipsGoWeighted, lateralBendStageUp, legRaiseLevelUp, LiftCtx, NORDIC_LEVELS, nordicLevelUp, PastResult,
-  PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, suggestRpt, suggestStraight, usableHistory,
+  parseRir, PULLUP_WEEKS, PULLUP_WEIGHTED, pullupsGoWeighted, reduceTenPercent, rptSets, SetTarget, sizedStep, suggestRpt, suggestStraight, usableHistory,
 } from './engine/progression';
 import { DROP, MOBILITY } from './store';
 import type { AppState, Exercise, Program, ProgramItem, Scheme, SessionLog, SetLog } from './store';
@@ -216,7 +216,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     let reason = '';
     // The scheme the session screen works with, when it differs from the program's (weighted lateral bend).
     let shown: typeof scheme | undefined;
-    const ctx = (): LiftCtx => ({ exId: ex, equip, gym, week });
+    const ctx = (): LiftCtx => ({ exId: ex, equip, gym, week, rirTarget: parseRir(byWeek?.rir ?? program.rirByWeek[week]) });
 
     switch (scheme.t) {
       case 'rpt': {
@@ -247,6 +247,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
               const w = Math.min(...done.map(x => x.weight!));
               const reps = Math.min(...done.map(x => x.reps));
               const rir = Math.min(...done.map(x => x.rir ?? 0));
+              const rirKnown = done.every(x => x.rir != null) ? rir : null;
               const want = scheme.reps[i];
               const same = roundNearest(w, equip, gym, ex);
               // 10 Nov 2026 (Brad, iso row: 30 x 10 and 25 x 10 last time, then asked for 35 x 10 and 30 x 12):
@@ -261,7 +262,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
               // 27 Oct 2026: back-off sets progress like the top set. At the top of their range (2 over the
               // target) or with 4+ in reserve, one step up; otherwise the same weight for one more rep.
               const up = reps >= want + 2 || rir >= 4;
-              const weight = Math.min(top, up ? oneStepUp(w, equip, gym, ex) : same);
+              const weight = Math.min(top, up ? sizedStep(w, reps, rirKnown, want, ctx()) : same);
               // One more rep only at exactly the weight done last time. A different weight (e.g. 16 kg at Port
               // Hedland rounding to 15 in Adelaide) aims for the set's own target (28 Oct 2026).
               const aim = weight === w ? Math.min(want + 2, reps + 1) : want;
