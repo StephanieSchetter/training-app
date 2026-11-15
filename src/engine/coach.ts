@@ -49,10 +49,12 @@ export function steadyHr(laps: HrLap[], uptoSec?: number): Steady | null {
 /** One easy run at a given speed, as the pace rule sees it. Lap detail is optional. */
 export interface EasyRun { avgHr: number; driftPct?: number | null; lateHr?: number | null; slowed?: boolean }
 
-/** Not easy: had to slow down, a high average, a high finish, or heart rate that kept climbing. */
+/** Not easy: had to slow down, a high average, or a high finish. (15 Nov 2026, Brad: heart-rate drift alone no
+ *  longer makes a run "not easy". Drift over 5% is normal indoors and early in training, and a run that stayed
+ *  under the ceilings was easy. Drift still has to be under 5% before the pace goes up, see below.) */
 export const isHardEasy = (r: EasyRun) =>
-  !!r.slowed || r.avgHr >= EASY_HR_HIGH || (r.lateHr ?? 0) >= EASY_LATE_HR || (r.driftPct ?? 0) > DRIFT_MAX_PCT;
-export const isComfortableEasy = (r: EasyRun) => !isHardEasy(r) && r.avgHr <= EASY_HR_OK;
+  !!r.slowed || r.avgHr >= EASY_HR_HIGH || (r.lateHr ?? 0) >= EASY_LATE_HR;
+export const isComfortableEasy = (r: EasyRun) => !isHardEasy(r) && r.avgHr <= EASY_HR_OK && (r.driftPct ?? 0) <= DRIFT_MAX_PCT;
 
 /**
  * Easy pace from the runs done at the current speed, oldest first.

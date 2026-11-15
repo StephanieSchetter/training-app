@@ -86,8 +86,8 @@ export function runDebrief(state: AppState, r: RunLog): Debrief | null {
     const hard = isHardEasy(row);
     const st = row.steady;
     notes.push(st
-      ? { tone: st.driftPct > DRIFT_MAX_PCT || st.lateThird >= EASY_LATE_HR ? 'watch' : 'good',
-          text: `Average ${row.avgHr} bpm at ${row.speed} km/h. Heart rate went from about ${st.early} in the first half to ${st.late} in the second (${st.driftPct > 0 ? 'up' : 'down'} ${Math.abs(st.driftPct)}%), finishing around ${st.lateThird}.${st.driftPct > DRIFT_MAX_PCT ? ` A rise of more than ${DRIFT_MAX_PCT}% at a fixed speed means the effort crept above easy.` : ''}` }
+      ? { tone: st.lateThird >= EASY_LATE_HR ? 'watch' : st.driftPct > DRIFT_MAX_PCT ? 'info' : 'good',
+          text: `Average ${row.avgHr} bpm at ${row.speed} km/h. Heart rate went from about ${st.early} in the first half to ${st.late} in the second (${st.driftPct > 0 ? 'up' : 'down'} ${Math.abs(st.driftPct)}%), finishing around ${st.lateThird}.${st.lateThird >= EASY_LATE_HR ? ` Finishing at ${EASY_LATE_HR} or above means the effort crept above easy.` : st.driftPct > DRIFT_MAX_PCT ? ` It stayed under ${EASY_LATE_HR}, so this was still easy. A rise of more than ${DRIFT_MAX_PCT}% is normal indoors and early on; it shrinks as your aerobic base builds, and the speed only goes up once it stays under ${DRIFT_MAX_PCT}%.` : ''}` }
       : { tone: 'info', text: `Average ${row.avgHr} bpm at ${row.speed} km/h. There was no lap detail from the watch, so only the average can be judged.` });
     if (r.slowedTo !== undefined) notes.push({ tone: 'watch', text: `You slowed to ${r.slowedTo} km/h part-way to keep it easy. That was the right call, and it tells the app ${row.speed} km/h is a little quick for now.` });
     const prev = rows.filter(x => x.speed === row.speed && x.date < row.date).at(-1);

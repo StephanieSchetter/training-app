@@ -407,6 +407,10 @@ describe('coach: reading an easy run from its laps', () => {
   it('easy pace: two runs that did not stay easy ease it back, before any time trial', () => {
     const a = { avgHr: 145, driftPct: 8, lateHr: 156 }, b = { avgHr: 141, driftPct: 5.9, lateHr: 151 };
     expect(isHardEasy(a) && isHardEasy(b)).toBe(true);
+    // 15 Nov 2026: drift alone (134 average, finishing 144, up 9%) is still easy, but not "comfortable" enough to speed up.
+    const nov15 = { avgHr: 134, driftPct: 9, lateHr: 144 };
+    expect(isHardEasy(nov15)).toBe(false);
+    expect(isComfortableEasy(nov15)).toBe(false);
     expect(easyPaceAdvice(10, 10, [a, b])).toEqual({ speed: 9.8, why: 'down', used: 2 });
     expect(easyPaceAdvice(10, 10, [b])).toBeNull();
     // one steady run in between resets it
