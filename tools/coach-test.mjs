@@ -94,14 +94,14 @@ check('The read says slowing was right', t.includes('Slowed down to keep it easy
 // Sunday of week 1: the weekly review
 await on('2026-10-18');
 t = await text();
-check('Sunday shows the week\'s review on the home screen', /WEEK 1 REVIEW/i.test(t) && t.includes('Sessions: 1 of 7 done') && t.includes('Mobility: 0 evenings, target 4–5'), t.split(/WEEK 1 REVIEW/i)[1]);
+check('Sunday shows the week\'s review on the home screen', /WEEKLY REVIEW/i.test(t) && t.includes('Sessions: 1 of 7 done') && t.includes('Mobility: 0 evenings, target 4–5'), t.split(/WEEKLY REVIEW/i)[1]);
 check('It names the one thing to focus on', t.includes('Consistency first'));
 check('It reports running and the easy run that drifted', t.includes('Running: 6.9 km.') && t.includes("1 of 1 easy runs didn't stay easy"));
 await shot('weekly-review');
 await on('2026-10-15');
-check('No weekly review on the home screen mid-week', !/WEEK 1 REVIEW/i.test(await text()));
+check('No weekly review on the home screen mid-week', !/WEEKLY REVIEW/i.test(await text()));
 await click('Progress');
-check('Progress always shows the current week so far', /WEEK 1 REVIEW/i.test(await text()) && (await text()).includes('so far'));
+check('Progress always shows the current week so far', /WEEKLY REVIEW/i.test(await text()) && (await text()).includes('so far'));
 
 await browser.close();
 console.log(results.every(Boolean) ? `\nAll ${results.length} coach checks passed` : `\n${results.filter(x => !x).length} of ${results.length} coach checks FAILED`);

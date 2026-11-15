@@ -183,7 +183,9 @@ export function weeklyReview(state: AppState, week: number, today: string): Week
   const complete = today >= to;
   const notes: Note[] = [];
 
-  const slots = state.schedule.filter(s => s.week === week);
+  // 15 Nov 2026: sessions are counted by the dates they fall on in this Monday-to-Sunday week. Missed days push
+  // training weeks later than calendar weeks, so counting by training week showed "0 of 7" for a full week.
+  const slots = state.schedule.filter(s => inWeek(s.date));
   const planned = slots.filter(s => !s.skipped).length;
   const doneSlots = slots.filter(s => s.done && !s.skipped).length;
   const due = slots.filter(s => !s.skipped && s.date <= today).length;

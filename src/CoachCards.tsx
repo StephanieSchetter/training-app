@@ -29,7 +29,7 @@ const span = (r: WeekReview) => {
 export function ReviewCard({ review }: { review: WeekReview }) {
   return (
     <div className="card coach">
-      <div className="overline">Week {review.week} review · {span(review)}{review.complete ? '' : ' · so far'}</div>
+      <div className="overline">Weekly review · {span(review)}{review.complete ? '' : ' · so far'}</div>
       <b>{review.focus}</b>
       <Notes notes={review.notes} />
     </div>
