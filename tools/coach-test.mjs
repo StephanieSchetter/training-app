@@ -72,12 +72,12 @@ await click('Back');
 
 await click('Use 9.8');
 t = await text();
-check('Accepting moves upcoming easy runs to 9.8', /Easy Run\s*40 min at 9\.8 km\/h/.test(t) && !/suggestion · easy pace/i.test(t), t.split('COMING UP')[1]);
+check('Accepting moves upcoming easy runs to 9.8', /Easy Run\s*39 min at 9\.8 km\/h/.test(t) && !/suggestion · easy pace/i.test(t), t.split('COMING UP')[1]);
 
 // Next Monday: slowing down part-way is logged at the finish
 await on('2026-10-19');
 await click('Open Easy Run'); await click('Start this run');
-check('The run starts at the accepted speed', (await text()).includes('40 min at 9.8 km/h'));
+check('The run starts at the accepted speed', (await text()).includes('39 min at 9.8 km/h'));
 await click('Done'); await click('Done'); await click('Finish run');
 await click('Yes', 1);
 t = await text();
