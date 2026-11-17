@@ -36,6 +36,8 @@ function finish(id: string, answer?: RunLog['answer'], wrap: Wrap = {}) {
   patch(id, (r, s) => {
     r.finishedAt = Date.now();
     r.answer = answer;
+    // Intervals and threshold are run from the watch (18 Nov 2026): one Done for the whole session.
+    if (answer === 'yes' || answer === 'no') r.segs.forEach(x => { x.done = true; });
     Object.assign(r, wrap);
     const slot = s.schedule.find(z => z.idx === r.slotIdx);
     if (slot) slot.done = true;
@@ -70,7 +72,7 @@ export function RunSession({ runId }: { runId: string }) {
   useWakeLock();
 
   const plan = buildRun(state.program!, run.week, run.type, currentSpeeds(state), run.adjust)!;
-  const closeBtn = <button className="icon-btn" aria-label="Leave run" onClick={() => (run.segs.some(s => s.done) ? setLeaving(true) : discard(run.id))}><Icon name="x" /></button>;
+  const closeBtn = <button className="icon-btn" aria-label="Leave run" onClick={() => (plan.asks || run.segs.some(s => s.done) ? setLeaving(true) : discard(run.id))}><Icon name="x" /></button>;
   const leaveSheet = leaving && (
     <Sheet title="Leave this run?" onClose={() => setLeaving(false)}>
       <p className="muted">What you've ticked off is saved. You can pick it up again from the home screen.</p>
@@ -101,6 +103,48 @@ export function RunSession({ runId }: { runId: string }) {
   );
   const kind = run.type as 'intervals' | 'threshold';
   const speedNow = plan.asks ? currentSpeeds(state)[kind] : 0;
+
+  // Intervals and threshold (Brad, 18 Nov 2026): tapping the phone mid-rep at 13.5 km/h isn't practical, so the
+  // whole session is shown up front and finished with one Done. The watch records the reps.
+  if (plan.asks) {
+    const setRan = (d: number) => patch(run.id, r => { for (const x of r.segs) if (x.work && x.prescribed !== undefined) x.actual = Math.round(((x.actual ?? x.prescribed) + d) * 10) / 10; });
+    return (
+      <div className="screen">
+        <AppBar title={run.title} sub={<><Icon name="clock" size={13} /> <Elapsed since={run.startedAt} /> · Week {run.week}</>} left={closeBtn} />
+        <main className="page">
+          {plan.over8 && <div className="notice"><Icon name="info" size={16} /> This run comes to more than {plan.capKm} km in total ({plan.km.toFixed(1)} km).</div>}
+          <p className="lead small">Run it from your watch and the treadmill, pressing lap on the watch for each rep. Press Done at the end.</p>
+          {main?.prescribed !== undefined && (
+            <Stepper label="Speed you ran the reps at" unit="km/h" value={ranAt.toFixed(1)} onMinus={() => setRan(-0.1)} onPlus={() => setRan(0.1)} />
+          )}
+          {[...new Set(run.segs.map(s => s.section))].map(section => (
+            <div className="stack" key={section}>
+              <h2>{section}</h2>
+              <div className="card list">
+                {run.segs.map((s, i) => s.section !== section ? null : (
+                  <div key={i} className="setrow planrow">
+                    <span className="grow"><span className="plan-ex"><span>{s.text}</span>{s.detail && <span className="muted small">{s.detail}</span>}</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </main>
+        <Dock><button className="btn primary" onClick={end}>Done</button></Dock>
+        {asking && (
+          <Sheet title="Could you have done 2 more reps at this speed?" onClose={() => setAsking(false)}>
+            <p className="muted">{run.practice ? 'Practice only: your answer changes nothing.' : `This sets next week's speed. You ran at ${speedNow} km/h today.`}</p>
+            <button className="btn option" onClick={() => finish(run.id, 'yes', wrap())}><b>Yes</b><span className="small muted">Next week goes up to {(speedNow + 0.3).toFixed(1)} km/h</span></button>
+            <button className="btn option" onClick={() => finish(run.id, 'no', wrap())}><b>No</b><span className="small muted">Next week stays at {speedNow} km/h</span></button>
+            <button className="btn option" onClick={() => finish(run.id, 'dnf', wrap())}><b>Couldn't finish all reps</b><span className="small muted">Speed stays the same, unless it happens twice in a row</span></button>
+            {conditionFields}
+            <button className="btn ghost" onClick={() => setAsking(false)}>Back to the run</button>
+          </Sheet>
+        )}
+        {leaveSheet}
+      </div>
+    );
+  }
 
   return (
     <div className="screen">

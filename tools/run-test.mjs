@@ -34,10 +34,8 @@ async function doIntervals(date, answer, { skipLast = false } = {}) {
   await on(date);
   await click('Open Intervals'); await click('Start this run');
   if (date === '2026-10-14') await shot('first-rep');
-  let n = await page.evaluate(() => document.querySelectorAll('.segs > *').length);
-  if (skipLast) n -= 3;
-  for (let i = 0; i < n; i++) await click('Done');
-  await click(skipLast ? 'End' : 'One question');
+  // one Done for the whole session (18 Nov 2026)
+  await click('Done');
   if (date === '2026-10-14') await shot('question');
   await click(answer);
 }
@@ -45,8 +43,8 @@ async function doIntervals(date, answer, { skipLast = false } = {}) {
 // Practice run before the block: answering "Yes" must change nothing
 await on('2026-10-07');
 await click('Intervals', 1);
-for (let i = 0, n = await page.evaluate(() => document.querySelectorAll('.segs > *').length); i < n; i++) await click('Done');
-await click('One question');
+check('Intervals: the whole session is listed with a single Done (18 Nov 2026)', await page.evaluate(() => document.querySelectorAll('.planrow').length >= 10 && [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === 'Done').length === 1));
+await click('Done');
 await click('Yes');
 const afterPractice = await text();
 check('Practice intervals can be run before the block', afterPractice.includes('Delete practice data'));

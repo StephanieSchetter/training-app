@@ -75,12 +75,10 @@ check('Back at Port Hedland in November: 65 kg done well moves to 67.5, the agre
 await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; s.activeRunId = null; }));
 await on('2026-10-21');
 await click('Open Intervals'); await click('Start this run');
-await click('Done'); await click('Done');   // warm-up
+// 18 Nov 2026: one Done for the whole session; not finishing is one of the answers
+await click('Done');
 t = await text();
-check('During a rep there is an obvious way to stop', t.includes("Can't finish this rep? End the run here"));
-await click("Can't finish this rep?");
-t = await text();
-check('Stopping early asks only the right question', t.includes('Ending the run early') && t.includes("Couldn't finish all reps") && !t.includes('Yes, could have'), t.slice(-400));
+check('Done asks the question, with not finishing as an option', /could you have done 2 more reps/i.test(t) && t.includes("Couldn't finish all reps"), t.slice(-400));
 await click("Couldn't finish all reps");
 check('It is recorded as not finished', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'dnf' && !!r.finishedAt && r.segs.filter(x => x.work && x.done).length === 0; }));
 await page.evaluate(() => window.__dev.update(s => { const at = Date.now() - 3600000; s.sessions.push({ id: 'gymc-check', slotIdx: null, type: 'gymC', date: '2026-10-22', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 }); }));
@@ -96,13 +94,9 @@ check('"Stiff" is saved and changes nothing: no hold, no offers', (await page.ev
 await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; s.activeRunId = null; }));
 await on('2026-10-24');
 await click('Open Threshold'); await click('Start this run');
-for (let i = 0; i < 6; i++) await click('Done');   // warm-up 2, rep 1, recovery, rep 2, recovery
-await click("Can't finish this rep?");
-await click('I finished this rep');
-t = await text();
-check('"I finished this rep" ticks it and asks the usual question', /could you have done 2 more reps/i.test(t), t.slice(-300));
+await click('Done');
 await click('No');
-check('Saved as all reps done with the real answer, cool-down skipped', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'no' && r.segs.filter(x => x.work).every(x => x.done) && !r.segs.at(-1).done; }));
+check('Threshold: one Done, the answer saved and every part marked done', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'no' && r.segs.every(x => x.done); }));
 
 // 23 Oct: a rest day taken on purpose skips today's session and moves nothing else
 await page.evaluate(() => window.__dev.update(s => { s.activeSessionId = null; s.activeRunId = null; }));
