@@ -106,6 +106,8 @@ function sessionResult(sets: SetLog[], session: SessionLog, worseBefore: boolean
     excused: !!(session.badDay || session.readinessAccepted || session.readiness?.accepted || worseBefore),
     deload: session.week === DELOAD_WEEK,
     topRir: work.filter(s => s.setNo === work[0].setNo).reduce<number | null>((low, s) => (s.rir === null || low === null ? null : Math.min(low, s.rir)), Infinity),
+    weights: [...bySet.values()].map(g => g[0].weight ?? 0),
+    rirs: [...bySet.values()].map(g => (g.some(x => x.rir == null) ? null : Math.min(...g.map(x => x.rir as number)))),
   };
 }
 
@@ -359,7 +361,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
           targets = Array.from({ length: scheme.sets }, () => ({ weight: null, reps: r[0] }));
           reason = '';
         } else {
-          const s = suggestStraight(scheme.sets, r, history, ctx());
+          const s = suggestStraight(scheme.sets, r, history, ctx(), false, scheme.t === 'straight');
           targets = s.sets; reason = s.reason;
         }
         const unit = scheme.t === 'fixed' && scheme.unit ? ` ${scheme.unit}` : '';

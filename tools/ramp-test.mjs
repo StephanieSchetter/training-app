@@ -85,7 +85,7 @@ await page.evaluate(() => window.__dev.update(s => {
 await page.goto('http://localhost:5173/?local&nocatchup&today=2026-10-27', { waitUntil: 'networkidle0' }); await wait(250);
 await click('Gym B');
 t = await text();
-check('A non-main lift (incline curl) shows one lighter set in the preview (7 kg: light dumbbells go in 1 kg steps)', /Incline Dumbbell Curl[\s\S]{0,40}Warm-up sets: 7 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
+check('A non-main lift (incline curl) shows one lighter set in the preview (set 1 hit 10 at 12.5, so it goes to 15; 9 kg: light dumbbells go in 1 kg steps)', /Incline Dumbbell Curl[\s\S]{0,40}Warm-up sets: 9 × 6/.test(t), t.split('Incline Dumbbell Curl')[1]?.slice(0, 80));
 
 // 30 Oct: no pairs any more (busy gyms), so the lateral raise's warm-up leads straight into its own working sets
 await page.evaluate(() => window.__dev.update(s => {

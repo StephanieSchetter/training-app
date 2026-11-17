@@ -45,6 +45,10 @@ export interface PastResult {
   deload?: boolean;
   /** Reps in reserve logged on the top set (4 = "4+"); for each-leg lifts the lower side. Unset when not logged. */
   topRir?: number | null;
+  /** Weight of each set, in set order, when known (sets can differ). */
+  weights?: number[];
+  /** Reps in reserve of each set (lower side for each-leg lifts); null when not logged. */
+  rirs?: (number | null)[];
 }
 
 export interface SetTarget { weight: number | null; reps: number }
@@ -151,11 +155,31 @@ export function suggestRpt(scheme: number[], history: PastResult[], ctx: LiftCtx
  * first set was far from failure). everySetAtTop keeps the stricter original rule where it was agreed
  * with the physio (45° back extension).
  */
-export function suggestStraight(sets: number, range: [number, number], history: PastResult[], ctx: LiftCtx, everySetAtTop = false): Suggestion {
+export function suggestStraight(sets: number, range: [number, number], history: PastResult[], ctx: LiftCtx, everySetAtTop = false, perSet = false): Suggestion {
   const targets = Array(sets).fill(range[0]);
   const h = usableHistory(history, ctx);
   const last = h.at(-1);
   if (ctx.week === 1 || !last) return findLoad(history, ctx, targets);
+  // Brad, 17 Nov 2026: on rep-range lifts each set moves on its own. A set that reached the top of the range goes
+  // up a weight (sized to how easy it was) and starts at the bottom; any other set stays at the weight it was done
+  // at and aims for one more rep. A set not done last time starts at the bottom with the last set's weight.
+  if (perSet && range[0] < range[1]) {
+    const ws = last.weights?.length ? last.weights : [last.weight];
+    let ups = 0;
+    const out = Array.from({ length: sets }, (_, i) => {
+      const w = ws[Math.min(i, ws.length - 1)];
+      const reps = last.reps[i];
+      if (reps == null) return { weight: roundNearest(w, ctx.equip, ctx.gym, ctx.exId), reps: range[0] };
+      if (reps >= range[1]) { ups++; return { weight: sizedStep(w, reps, last.rirs?.[i] ?? null, range[0], ctx), reps: range[0] }; }
+      return { weight: roundNearest(w, ctx.equip, ctx.gym, ctx.exId), reps: Math.min(range[1], Math.max(range[0], reps + 1)) };
+    });
+    return {
+      kind: 'weights', sets: out,
+      reason: ups === 0 ? `Same weights, one more rep on each set (a set goes up a weight once it reaches ${range[1]})`
+        : ups === sets ? `Every set reached ${range[1]}: each goes up a weight`
+        : `Sets that reached ${range[1]} go up a weight; the rest aim for one more rep`,
+    };
+  }
   const allTop = last.reps.length >= sets && last.reps[0] >= range[1] && last.reps.every(x => x >= (everySetAtTop ? range[1] : range[0]));
   const weight = allTop
     ? sizedStep(last.weight, last.reps[0], last.topRir, range[0], ctx)

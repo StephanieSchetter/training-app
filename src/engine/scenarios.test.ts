@@ -108,6 +108,18 @@ describe('gym progression', () => {
     expect(lateralBendStageUp(rows(() => ({})).slice(0, 5), 3, 12)).toBe(false); // a side missing
   });
 
+  it('rep-range lifts: each set moves on its own (Brad, 17 Nov 2026)', () => {
+    const ctx: LiftCtx = { exId: 'incline_curl', equip: 'dumbbell', gym: adelaide, week: 5, rirTarget: 2 };
+    // 17 Nov: 15x9, 15x8, then 12.5x11, 12.5x10
+    const s = suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 15, weights: [15, 15, 12.5, 12.5], reps: [9, 8, 11, 10], rirs: [2, 1, 1, 1] }], ctx, false, true);
+    expect(s.sets).toEqual([{ weight: 15, reps: 10 }, { weight: 15, reps: 9 }, { weight: 15, reps: 8 }, { weight: 15, reps: 8 }]);
+    // never asks for more reps on a later set than that set managed, at the same weight
+    const t = suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 15, weights: [15, 15, 15, 15], reps: [10, 9, 8, 8], rirs: [1, 1, 1, 1] }], ctx, false, true);
+    expect(t.sets).toEqual([{ weight: 17.5, reps: 8 }, { weight: 15, reps: 10 }, { weight: 15, reps: 9 }, { weight: 15, reps: 9 }]);
+    // a set not done last time starts at the bottom with the last set's weight
+    expect(suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 15, weights: [15, 15, 15], reps: [9, 9, 8] }], ctx, false, true).sets[3]).toEqual({ weight: 15, reps: 8 });
+  });
+
   it('straight sets: all at top -> one step, otherwise same', () => {
     const ctx: LiftCtx = { exId: 'curl', equip: 'dumbbell', gym: adelaide, week: 3 };
     expect(suggestStraight(4, [8, 10], [{ gymId: 'adelaide', weight: 10, reps: [10, 10, 10, 10] }], ctx).sets[0].weight).toBe(12.5);
