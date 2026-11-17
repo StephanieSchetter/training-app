@@ -11,6 +11,7 @@ const HISTORY_DAYS = 120;
 export function energyDays(state: AppState, today: string): EnergyDay[] {
   const from = addDays(today, -HISTORY_DAYS);
   const kg = new Map(state.weights.map(w => [w.date, w.kg]));
+  const skip = new Set(state.nutrition.skipIntake ?? []);
   const dates = [...Object.keys(state.garminDays).filter(d => state.garminDays[d].kcalIn != null || state.garminDays[d].kcalOut != null), ...kg.keys()]
     .filter(d => d >= from && d < today).sort();
   if (!dates.length) return [];
@@ -18,7 +19,7 @@ export function energyDays(state: AppState, today: string): EnergyDay[] {
   for (let d = dates[0]; d < today; d = addDays(d, 1)) {
     const g = state.garminDays[d];
     // At FIFO Brad weighs on the gym's scale; at home on his own. Each gets its own baseline.
-    out.push({ date: d, weight: kg.get(d) ?? null, kcalIn: g?.kcalIn ?? null, kcalOut: g?.kcalOut ?? null, scale: gymForDate(state, d).id });
+    out.push({ date: d, weight: kg.get(d) ?? null, kcalIn: skip.has(d) ? null : g?.kcalIn ?? null, kcalOut: g?.kcalOut ?? null, scale: gymForDate(state, d).id });
   }
   return out;
 }
@@ -38,7 +39,8 @@ export function energyView(state: AppState, today: string): EnergyView {
   const lastEntry = [...state.weights].sort((a, b) => a.date.localeCompare(b.date)).at(-1)?.kg;
   const weight = trend ?? lastEntry ?? null;
   const week = Array.from({ length: 7 }, (_, i) => addDays(today, -1 - i));
-  const eaten = week.map(d => state.garminDays[d]?.kcalIn).filter((k): k is number => k != null && k >= 1200);
+  const skip = new Set(state.nutrition.skipIntake ?? []);
+  const eaten = week.filter(d => !skip.has(d)).map(d => state.garminDays[d]?.kcalIn).filter((k): k is number => k != null && k >= 1200);
   const protein = week.map(d => state.nutrition.protein[d]).filter((g): g is number => g != null);
   const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
   return {

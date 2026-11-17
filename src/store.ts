@@ -194,7 +194,8 @@ export interface AppState {
   /** Body weight, typed in weekly. One entry per date. */
   weights: { date: string; kg: number }[];
   /** Protein eaten per day in grams, typed in from MyFitnessPal (Garmin only passes on calories). */
-  nutrition: { protein: Record<string, number> };
+  /** skipIntake (17 Nov 2026): days whose food log was incomplete, left out of every calorie figure. */
+  nutrition: { protein: Record<string, number>; skipIntake?: string[] };
   /** Evening stretch: which of the six were ticked, per date. */
   stretch: Record<string, number[]>;
   physio: { id: string; date: string; text: string }[];
