@@ -48,6 +48,21 @@ check('Weight and yesterday\'s protein are saved', await page.evaluate(() => { c
 t = await text();
 check('Targets appear once there is a weight: lose / maintain / build, and protein', /LOSE FAT\s*2,4\d0/.test(t) && /MAINTAIN\s*3,000/.test(t) && /BUILD MUSCLE\s*3,2\d0/.test(t) && t.includes('Protein: about 190 g a day'), t.split(/CALORIES · FROM YOUR DATA/i)[1]?.slice(0, 500));
 
+// Waist (18 Nov 2026): Thursday has no waist box; Wednesday does, and it can be saved after the weigh-in.
+check('No waist box on a Thursday (15 Oct)', await page.$('input[aria-label="Waist in cm"]') === null);
+await on('2026-10-21');
+check('Wednesday: waist box beside the weigh-in', await page.$('input[aria-label="Waist in cm"]') !== null && await page.$('input[aria-label="Body weight in kg"]') !== null);
+await page.type('input[aria-label="Body weight in kg"]', '95.9');
+await click('Save');
+t = await text();
+check('Weight saved without the waist: the card stays for the waist alone', /MORNING WEIGH-IN/i.test(t) && await page.$('input[aria-label="Body weight in kg"]') === null && await page.$('input[aria-label="Waist in cm"]') !== null);
+await page.type('input[aria-label="Waist in cm"]', '87');
+await click('Save');
+t = await text();
+check('Waist saved; card gone', await page.evaluate(() => window.__dev.getState().nutrition.waist?.['2026-10-21'] === 87) && !/MORNING WEIGH-IN/i.test(t));
+await on('2026-10-28');
+check('Next Wednesday: the box shows the last waist', (await page.$eval('input[aria-label="Waist in cm"]', e => e.placeholder)).includes('last 87 cm'));
+
 // Four weeks later, with daily weigh-ins: losing 0.35 kg a week on 2,600 a day -> about 2,985
 await on('2026-11-12');
 await seed(28, '2026-11-12', true);

@@ -112,12 +112,18 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
   const [resting, setResting] = useState<Slot | null>(null);
   const [kg, setKg] = useState('');
   const [protein, setProtein] = useState('');
+  const [waist, setWaist] = useState('');
   const p = state.program!;
   const t = today();
   const stretched = (state.stretch[t] ?? []).length;
   // Body weight is asked for every morning (changed from weekly on 14 Oct 2026, for the calorie estimate).
   const lastWeight = [...state.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
   const weightDue = !state.weights.some(w => w.date === t);
+  // Waist (Brad, 18 Nov 2026): asked for on Wednesdays, in cm, alongside the weigh-in.
+  const waists = state.nutrition.waist ?? {};
+  const lastWaist = Object.keys(waists).sort().at(-1);
+  const waistDue = new Date(t + 'T12:00:00').getDay() === 3 && waists[t] === undefined;
+  const kgOk = Number(kg) > 20 && Number(kg) < 300, waistOk = Number(waist) > 40 && Number(waist) < 200;
   const yesterday = addDays(t, -1);
   const energy = energyView(state, t);
   const fmt = (n: number) => n.toLocaleString('en-AU');
@@ -338,20 +344,22 @@ export function Home({ state, sync, onOpen, onStretch, onProgress }: { state: Ap
         {stretched >= p.stretches.length ? <span className="ok"><Icon name="check" /></span> : <span className="muted"><Icon name="right" /></span>}
       </button>}
 
-      {weightDue && !VIEW_ONLY && (
+      {(weightDue || waistDue) && !VIEW_ONLY && (
         <div className="card">
           <div className="overline">Morning weigh-in</div>
           <div className="muted small">{`${stint ? 'At the gym scale, before eating if you can.' : 'First thing, after the toilet, before food or drink.'} Missed days are fine, and the gym and home scales are kept apart. Daily ups and downs are normal; the app follows the trend.`}{lastWeight ? ` Last entry: ${lastWeight.kg} kg on ${niceDate(lastWeight.date)}.` : ''}</div>
-          <input inputMode="decimal" aria-label="Body weight in kg" value={kg} placeholder={lastWeight ? `${lastWeight.kg} kg` : 'kg'} onChange={e => setKg(e.target.value)} />
-          {state.nutrition.protein[yesterday] === undefined && (
+          {weightDue && <input inputMode="decimal" aria-label="Body weight in kg" value={kg} placeholder={lastWeight ? `${lastWeight.kg} kg` : 'kg'} onChange={e => setKg(e.target.value)} />}
+          {waistDue && <input inputMode="decimal" aria-label="Waist in cm" value={waist} placeholder={`Waist in cm (Wednesdays, at the belly button, after a normal breath out)${lastWaist ? `, last ${waists[lastWaist]} cm on ${niceDate(lastWaist)}` : ''}`} onChange={e => setWaist(e.target.value)} />}
+          {weightDue && state.nutrition.protein[yesterday] === undefined && (
             <input inputMode="numeric" aria-label="Yesterday's protein in grams" value={protein} placeholder="Yesterday's protein in g (optional, from MyFitnessPal)" onChange={e => setProtein(e.target.value)} />
           )}
-          <button className="btn primary" disabled={!(Number(kg) > 20 && Number(kg) < 300)} onClick={() => {
+          <button className="btn primary" disabled={weightDue ? !kgOk || (waist !== '' && !waistOk) : !waistOk} onClick={() => {
             update(s => {
-              s.weights = [...s.weights.filter(w => w.date !== t), { date: t, kg: Math.round(Number(kg) * 10) / 10 }];
-              if (Number(protein) > 0 && Number(protein) < 600) s.nutrition = { ...s.nutrition, protein: { ...s.nutrition.protein, [yesterday]: Math.round(Number(protein)) } };
+              if (kgOk) s.weights = [...s.weights.filter(w => w.date !== t), { date: t, kg: Math.round(Number(kg) * 10) / 10 }];
+              if (weightDue && Number(protein) > 0 && Number(protein) < 600) s.nutrition = { ...s.nutrition, protein: { ...s.nutrition.protein, [yesterday]: Math.round(Number(protein)) } };
+              if (waistDue && waistOk) s.nutrition = { ...s.nutrition, waist: { ...(s.nutrition.waist ?? {}), [t]: Math.round(Number(waist) * 10) / 10 } };
             });
-            setKg(''); setProtein('');
+            setKg(''); setProtein(''); setWaist('');
           }}>Save</button>
         </div>
       )}
