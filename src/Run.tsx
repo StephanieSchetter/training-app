@@ -132,7 +132,7 @@ export function RunSession({ runId }: { runId: string }) {
         </main>
         <Dock><button className="btn primary" onClick={end}>Done</button></Dock>
         {asking && (
-          <Sheet title="Could you have done 2 more reps at this speed?" onClose={() => setAsking(false)}>
+          <Sheet title="Could you have done 1 more rep at this speed?" onClose={() => setAsking(false)}>
             <p className="muted">{run.practice ? 'Practice only: your answer changes nothing.' : `This sets next week's speed. You ran at ${speedNow} km/h today.`}</p>
             <button className="btn option" onClick={() => finish(run.id, 'yes', wrap())}><b>Yes</b><span className="small muted">Next week goes up to {(speedNow + 0.3).toFixed(1)} km/h</span></button>
             <button className="btn option" onClick={() => finish(run.id, 'no', wrap())}><b>No</b><span className="small muted">Next week stays at {speedNow} km/h</span></button>
@@ -209,7 +209,7 @@ export function RunSession({ runId }: { runId: string }) {
         </Sheet>
       )}
       {asking && plan.asks && (
-        <Sheet title={workDone < workTotal ? 'Ending the run early' : 'Could you have done 2 more reps at this speed?'} onClose={() => setAsking(false)}>
+        <Sheet title={workDone < workTotal ? 'Ending the run early' : 'Could you have done 1 more rep at this speed?'} onClose={() => setAsking(false)}>
           <p className="muted">
             {workDone < workTotal
               ? `You ticked ${workDone} of ${workTotal} reps.`

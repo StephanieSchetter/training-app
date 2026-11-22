@@ -12,7 +12,7 @@ export function runAdjustFor(score: number, type: RunType): RunAdjust {
 
 export interface RunLine { text: string; detail?: string; km: number; /** Minutes this part takes. */ min: number; /** A rep or main run whose speed is logged. */ work?: boolean; speed?: number }
 export interface RunSection { title: string; lines: RunLine[] }
-export interface RunPlan { title: string; summary: string; sections: RunSection[]; km: number; over8: boolean; /** The distance the warning is measured against. */ capKm: number; timeTrial?: boolean; /** Asks "2 more reps?" at the end. */ asks: boolean }
+export interface RunPlan { title: string; summary: string; sections: RunSection[]; km: number; over8: boolean; /** The distance the warning is measured against. */ capKm: number; timeTrial?: boolean; /** Asks "1 more rep?" at the end. */ asks: boolean }
 
 const kmFor = (minutes: number, speed: number) => (minutes * speed) / 60;
 const minFor = (km: number, speed: number) => (km / speed) * 60;

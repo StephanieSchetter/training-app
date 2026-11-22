@@ -94,7 +94,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
     const adjust = score !== null && runChoice === true ? runAdjustFor(score, type as RunType) : undefined;
     const run = program.running ? buildRun(program, week, type as RunType, currentSpeeds(state), adjust) : null;
     const done = slot ? state.runs.filter(r => r.slotIdx === slot.idx).at(-1) : undefined;
-    const ANSWERS = { yes: 'Yes, could have done 2 more reps', no: 'No, that was the limit', dnf: "Couldn't finish all reps" };
+    const ANSWERS = { yes: 'Yes, could have done 1 more rep', no: 'No, that was the limit', dnf: "Couldn't finish all reps" };
     if (done) {
       const debrief = runDebrief(state, done);
       const easyDone = done.title.startsWith('Easy');
@@ -108,7 +108,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
               <div><div className="overline">Next speed</div><b>{done.speedAfter !== undefined ? `${done.speedAfter} km/h` : '—'}</b></div>
             </div>
             {debrief && <DebriefCard debrief={debrief} />}
-            {done.answer && <div className="card"><div className="overline">2 more reps?</div>{ANSWERS[done.answer]}{done.speedBefore !== undefined && done.speedAfter !== undefined ? ` Speed ${done.speedBefore} → ${done.speedAfter} km/h.` : ''}</div>}
+            {done.answer && <div className="card"><div className="overline">1 more rep?</div>{ANSWERS[done.answer]}{done.speedBefore !== undefined && done.speedAfter !== undefined ? ` Speed ${done.speedBefore} → ${done.speedAfter} km/h.` : ''}</div>}
             {done.segs.length > 0 && (
               <>
                 <h2>What you did</h2>
@@ -158,7 +158,7 @@ export function SessionView({ state, target, onBack, onStart, onStartRun }: {
                 </div>
               ))}
               {run.asks && <p className="lead">Press lap on your watch for each rep.</p>}
-              {date > t && run.asks && <p className="lead small">Speeds shown are your current ones. They move up or down after each run's "2 more reps?" answer.</p>}
+              {date > t && run.asks && <p className="lead small">Speeds shown are your current ones. They move up or down after each run's "1 more rep?" answer.</p>}
               {date > t && <div className="card muted">This is a preview. The Start button appears here on {niceDate(date, true)}.</div>}
             </>
           )}

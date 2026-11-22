@@ -78,7 +78,7 @@ await click('Open Intervals'); await click('Start this run');
 // 18 Nov 2026: one Done for the whole session; not finishing is one of the answers
 await click('Done');
 t = await text();
-check('Done asks the question, with not finishing as an option', /could you have done 2 more reps/i.test(t) && t.includes("Couldn't finish all reps"), t.slice(-400));
+check('Done asks the question, with not finishing as an option', /could you have done 1 more rep/i.test(t) && t.includes("Couldn't finish all reps"), t.slice(-400));
 await click("Couldn't finish all reps");
 check('It is recorded as not finished', await page.evaluate(() => { const r = window.__dev.getState().runs.at(-1); return r.answer === 'dnf' && !!r.finishedAt && r.segs.filter(x => x.work && x.done).length === 0; }));
 await page.evaluate(() => window.__dev.update(s => { const at = Date.now() - 3600000; s.sessions.push({ id: 'gymc-check', slotIdx: null, type: 'gymC', date: '2026-10-22', gymId: 'adelaide', week: 2, swaps: {}, warmup: [], startedAt: at, finishedAt: at + 3600000 }); }));

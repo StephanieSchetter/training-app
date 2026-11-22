@@ -109,7 +109,7 @@ export interface RunLog {
   /** A trial run-through: never changes speeds, the schedule or charts. */
   practice?: boolean;
   segs: RunSegLog[];
-  /** "Could you have done 2 more reps at this speed?" */
+  /** "Could you have done 1 more rep at this speed?" */
   answer?: 'yes' | 'no' | 'dnf';
   timeTrial?: boolean; timeTrialSec?: number;
   readiness?: { score: number; accepted: boolean };
