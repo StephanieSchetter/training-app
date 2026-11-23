@@ -30,3 +30,12 @@ describe('machine lifts across gyms', () => {
     expect(carryAcrossGyms(p, gym('adelaide'), 'x', 'dumbbell')).toBe(p);
   });
 });
+
+describe('missed sessions around a travel day', () => {
+  it('uses up the gap instead of moving it', async () => {
+    const { catchUp } = await import('./schedule');
+    const slot = (idx: number, date: string) => ({ idx, week: 5, type: 'gymA', date, order: 1 }) as never;
+    const out = catchUp([slot(1, '2026-11-20'), slot(2, '2026-11-21'), slot(3, '2026-11-23'), slot(4, '2026-11-24'), slot(5, '2026-11-25')], '2026-11-20', '2026-11-22', new Set(['2026-11-22']));
+    expect((out as { date: string }[]).map(s => s.date)).toEqual(['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27']);
+  });
+});

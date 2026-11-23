@@ -41,6 +41,23 @@ export function shiftFrom(slots: Slot[], date: string, days = 1): Slot[] {
   return slots.map(s => (open(s) && s.date >= date ? { ...s, date: addDays(s.date, days) } : s));
 }
 
+/** Missed sessions (24 Nov 2026): the first lands on the next day that allows training, and each later session moves
+ *  only as far as it has to. Existing gaps are used up rather than carried along, and no-training days stay empty. */
+export function catchUp(slots: Slot[], from: string, today: string, noTraining: Set<string>): Slot[] {
+  const free = (d: string) => { while (noTraining.has(d)) d = addDays(d, 1); return d; };
+  const moved = new Map<number, string>();
+  let oldDate: string | null = null, newDate: string | null = null;
+  for (const s of slots.filter(x => open(x) && x.date >= from).sort((a, b) => a.date.localeCompare(b.date) || a.order - b.order)) {
+    if (s.date !== oldDate) {
+      const earliest: string = newDate ? addDays(newDate, 1) : today;
+      newDate = free(s.date > earliest ? s.date : earliest);
+      oldDate = s.date;
+    }
+    moved.set(s.idx, newDate!);
+  }
+  return slots.map(s => (moved.has(s.idx) ? { ...s, date: moved.get(s.idx)! } : s));
+}
+
 export const isGym = (t: SessionType) => t.startsWith('gym');
 
 /** Double-up is only ever easy run + Gym A, B or D (4.3). */
