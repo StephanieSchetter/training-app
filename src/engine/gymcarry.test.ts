@@ -18,6 +18,12 @@ describe('machine lifts across gyms', () => {
     const out = carryAcrossGyms([row('10-01', 'fifo', [[50, 9]]), row('10-10', 'adelaide', [[40, 7]]), row('10-20', 'adelaide', [[35, 8]])], gym('fifo'), 'x', 'machine');
     expect(out[3].result.weight).toBe(50);
   });
+  it('never estimates above the weight just lifted, and a lighter first set counts as the next one', () => {
+    const leg = carryAcrossGyms([row('10-01', 'fifo', [[65, 10], [60, 12]]), row('10-10', 'adelaide', [[60, 12]]), row('10-20', 'adelaide', [[72.5, 12]])], gym('fifo'), 'x', 'machine');
+    expect(leg[3].result.weight).toBe(72.5);
+    const calf = carryAcrossGyms([row('10-01', 'fifo', [[100, 12], [110, 12]]), row('10-10', 'adelaide', [[120, 15]]), row('10-20', 'adelaide', [[145, 15]])], gym('fifo'), 'x', 'machine');
+    expect(calf[3].result.weights).toEqual([132.5, 132.5]);
+  });
   it('changes nothing when the latest session was at this gym, or for free weights', () => {
     const p = [row('10-01', 'adelaide', [[50, 9]]), row('10-10', 'fifo', [[40, 7]])];
     expect(carryAcrossGyms(p, gym('fifo'), 'x', 'machine')).toBe(p);

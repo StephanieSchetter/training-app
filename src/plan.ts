@@ -144,13 +144,18 @@ export function carryAcrossGyms(past: Past[], gym: GymProfile, ex: string, equip
   const here = real[idx];
   const strength = (p: Past) => Math.max(...p.sets.filter(s => s.weight != null && !s.rampUp && !s.extra).map(s => s.weight! * (1 + s.reps / 30)));
   const ratio = Math.max(1, strength(latest) / strength(real[idx + 1]));
-  const scaled = (w: number) => roundNearest(w * ratio, equip as never, gym, ex);
-  const sets = here.sets.map(s => (s.weight == null || s.rampUp || s.extra ? s : { ...s, weight: scaled(s.weight), reps: Math.max(1, s.reps - 1), rir: null }));
-  const weights = (here.result.weights ?? [here.result.weight]).map(scaled);
+  // A lighter opening set (a leftover warm-up) counts as the heavier set after it. The estimate never passes the
+  // heavier of this gym's last weight and the weight just lifted at the other gym, so the jump stays sensible.
+  const latestTop = Math.max(...latest.sets.filter(s => s.weight != null && !s.rampUp && !s.extra).map(s => s.weight!));
+  const scaled = (w: number) => roundNearest(Math.min(w * ratio, Math.max(w, latestTop)), equip as never, gym, ex);
+  const hereWeights = here.result.weights ?? [here.result.weight];
+  const levelled = hereWeights.map((_, i) => Math.max(...hereWeights.slice(i)));
+  const sets = here.sets.map(s => (s.weight == null || s.rampUp || s.extra ? s : { ...s, weight: scaled(levelled[s.setNo - 1] ?? s.weight), reps: Math.max(1, s.reps - 1), rir: null }));
+  const weights = levelled.map(scaled);
   return [...past, {
     session: { ...latest.session, gymId: gym.id },
     sets,
-    result: { ...here.result, gymId: gym.id, weight: scaled(here.result.weight), weights, reps: here.result.reps.map(r => Math.max(1, r - 1)), rirs: weights.map(() => null), topRir: null, excused: true },
+    result: { ...here.result, gymId: gym.id, weight: weights[0], weights, reps: here.result.reps.map(r => Math.max(1, r - 1)), rirs: weights.map(() => null), topRir: null, excused: true },
   }];
 }
 
