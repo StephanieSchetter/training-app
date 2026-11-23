@@ -111,7 +111,7 @@ function sessionResult(sets: SetLog[], session: SessionLog, worseBefore: boolean
   };
 }
 
-interface Past { session: SessionLog; sets: SetLog[]; result: PastResult }
+export interface Past { session: SessionLog; sets: SetLog[]; result: PastResult }
 
 export function pastFor(state: AppState, exId: string, before: SessionLog): Past[] {
   const real = state.sessions.filter(s => !s.practice).sort((a, b) => a.startedAt - b.startedAt);
@@ -129,6 +129,29 @@ export function pastFor(state: AppState, exId: string, before: SessionLog): Past
       return result ? { session, sets, result } : null;
     })
     .filter((x): x is Past => x !== null);
+}
+
+/** Machines differ between gyms, so weights aren't copied across (23 Nov 2026). When the latest session of a machine
+ *  lift was at the other gym, the weights last used at this gym go up by the percentage gained there since leaving
+ *  (never down), and the session aims to match those reps rather than adding a step on top of the estimate. */
+export function carryAcrossGyms(past: Past[], gym: GymProfile, ex: string, equip: string): Past[] {
+  if (equip !== 'machine') return past;
+  const real = past.filter(p => !p.result.deload);
+  const latest = real.at(-1);
+  if (!latest || latest.session.gymId === gym.id) return past;
+  const idx = real.map(p => p.session.gymId).lastIndexOf(gym.id);
+  if (idx < 0) return past;
+  const here = real[idx];
+  const strength = (p: Past) => Math.max(...p.sets.filter(s => s.weight != null && !s.rampUp && !s.extra).map(s => s.weight! * (1 + s.reps / 30)));
+  const ratio = Math.max(1, strength(latest) / strength(real[idx + 1]));
+  const scaled = (w: number) => roundNearest(w * ratio, equip as never, gym, ex);
+  const sets = here.sets.map(s => (s.weight == null || s.rampUp || s.extra ? s : { ...s, weight: scaled(s.weight), reps: Math.max(1, s.reps - 1), rir: null }));
+  const weights = (here.result.weights ?? [here.result.weight]).map(scaled);
+  return [...past, {
+    session: { ...latest.session, gymId: gym.id },
+    sets,
+    result: { ...here.result, gymId: gym.id, weight: scaled(here.result.weight), weights, reps: here.result.reps.map(r => Math.max(1, r - 1)), rirs: weights.map(() => null), topRir: null, excused: true },
+  }];
 }
 
 /** Side plank holds aim no higher than this. */
@@ -191,7 +214,7 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     const ex = session.swaps[item.ex] ?? item.ex;
     const swapped = ex !== item.ex;
     const info = program.exercises[ex];
-    const past = pastFor(state, ex, session);
+    const past = carryAcrossGyms(pastFor(state, ex, session), state.profiles.find(p => p.id === session.gymId)!, ex, info.equip);
     // The deadlift follows the physio's graded return, so "felt very easy" never speeds it up.
     const graded = ex === 'deadlift' || ex === 'block_pull';
     const history = past.map(p => (graded ? { ...p.result, topRir: null } : p.result));
