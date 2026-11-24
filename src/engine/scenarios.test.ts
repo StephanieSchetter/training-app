@@ -480,3 +480,15 @@ describe('step size (14 Nov 2026: appropriate jumps)', () => {
     expect(s.sets[0].weight).toBe(82.5);
   });
 });
+
+describe('threshold laps split by the 1 km auto-lap (24 Nov 2026)', () => {
+  it('a last rep that ran on into the walk counts as finished', async () => {
+    const { matchRepLaps } = await import('./garmin');
+    const lap = (km: number, sec: number, avgHr: number) => ({ km, sec, avgHr });
+    const laps = [lap(1, 336, 115), lap(0.833, 263, 138), lap(1, 303, 152), lap(0.588, 178, 159), lap(0.274, 120, 135), lap(1, 303, 151), lap(0.589, 178, 161), lap(0.279, 120, 142), lap(1, 304, 156), lap(0.873, 296, 160), lap(0.923, 301, 145)];
+    const rep = { km: 1.63, speed: 12.2 };
+    const m = matchRepLaps(laps, [rep, rep, rep])!;
+    expect(m.stoppedEarly).toBe(false);
+    expect(m.reps).toHaveLength(3);
+  });
+});

@@ -67,6 +67,13 @@ export function matchRepLaps<L extends { sec: number }>(laps: L[], reps: Rep[]):
     const idx = best.slice(-reps.length);
     const last = idx.at(-1)!.e;
     const cut = laps[last + 2];
+    // 24 Nov 2026: the watch's 1 km auto-lap ended this lap, and the rep ran on into the next lap together with
+    // the walk after it (no lap press at the end). That is a finished rep, not one cut short.
+    const km = (cut as unknown as { km?: number } | undefined)?.km;
+    const autoSplit = !!cut && km != null && km >= 0.99 && Math.abs(km - Math.round(km)) < 0.005 && !!laps[last + 3] && cut.sec + laps[last + 3].sec >= want * (1 - tol);
+    if (idx.length < reps.length && autoSplit && !isRep(laps[last + 1])) {
+      return { reps: [...idx.map(joined), cut!], recoveries: [...idx.slice(0, -1).map(sp => laps[sp.e + 1]), laps[last + 1]], stoppedEarly: false };
+    }
     const stoppedEarly = idx.length < reps.length && !!cut && !isRep(laps[last + 1]) && cut.sec >= 20 && cut.sec < want * (1 - tol);
     return {
       reps: [...idx.map(joined), ...(stoppedEarly ? [cut] : [])],
