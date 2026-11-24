@@ -43,11 +43,15 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
   if ('easyKm' in w.threshold) w.threshold.speed = r1(w.threshold.speed + d);
   else if (adjust?.fewerReps) w.threshold.reps = Math.max(1, w.threshold.reps - adjust.fewerReps);
 
+  // Brad's own routine (24 Nov 2026): the warm-up and the final jog both climb 0.1 km/h every 20 seconds.
   const warm: RunSection = { title: 'Warm-up', lines: [
-    { text: '8 min, building from 9 to 10.5 km/h', km: kmFor(8, 9.75), min: 8 },
-    { text: '2 × 20 sec at 14 km/h', detail: 'Short pick-ups to wake the legs', km: kmFor(40 / 60, 14), min: 1 },
+    { text: '10 min, building from 8 km/h', detail: 'Up 0.1 km/h every 20 sec, finishing around 11 km/h', km: kmFor(10, 9.5), min: 10 },
   ] };
-  const cool: RunSection = { title: 'Cool-down', lines: [{ text: `5 min at ${sp.cooldown} km/h`, km: kmFor(5, sp.cooldown), min: 5 }] };
+  const jog = (m: number): RunLine => ({ text: `${m} min, building from 8 km/h`, detail: `Up 0.1 km/h every 20 sec, finishing around ${r1(8 + (m * 3 - 1) * 0.1)} km/h`, km: kmFor(m, 8 + m * 0.15), min: m });
+  const cool: RunSection = { title: 'Cool-down', lines: [
+    { text: `2 min walk at ${sp.thresholdRecovery} km/h`, km: kmFor(2, sp.thresholdRecovery), min: 2 },
+    jog(5),
+  ] };
   // After the last interval (Brad, 18 Nov 2026): walk it off like the other recoveries, then stop; no jog.
   const walkOff = (m: number): RunSection => ({ title: 'Cool-down', lines: [{ text: `Recovery: ${mins(m)} at ${sp.recovery} km/h, then stop`, km: kmFor(m, sp.recovery), min: m }] });
   const stridesMin = 2 + 200 / 60;
@@ -123,11 +127,17 @@ export function buildRun(program: Program, week: number, type: RunType, speeds?:
   const total = () => sections.reduce((a, s) => a + s.lines.reduce((b, l) => b + l.min, 0), 0);
   const last = sections.at(-1);
   if (last?.title === 'Cool-down' && total() > MAX_RUN_MIN) {
-    const l = last.lines[0];
-    const left = Math.floor(MAX_RUN_MIN - (total() - l.min));
-    if (left >= 1 && l.text.startsWith('5 min')) {
-      last.lines = [{ text: `${left} min at ${sp.cooldown} km/h`, km: kmFor(left, sp.cooldown), min: left }];
-    } else if (left < 1) sections = sections.slice(0, -1);
+    const l = last.lines.at(-1)!;
+    const room = MAX_RUN_MIN - (total() - l.min);
+    if (l.text.startsWith('Recovery')) {
+      // The walk after the last interval gives up the few seconds a slower day adds.
+      last.lines = walkOff(Math.max(0.5, Math.floor(room * 2) / 2)).lines;
+    } else if (Math.floor(room) >= 1) {
+      last.lines = [...last.lines.slice(0, -1), jog(Math.floor(room))];
+    } else {
+      last.lines = last.lines.slice(0, -1);
+      if (!last.lines.length) sections = sections.slice(0, -1);
+    }
   }
   const km = sections.reduce((a, s) => a + s.lines.reduce((b, l) => b + l.km, 0), 0);
   const capKm = plan.maxKm ?? MAX_RUN_KM;
