@@ -14,6 +14,8 @@ export interface GymProfile {
   machineSteps: Record<string, number>;
   /** Machines whose step changes part-way up the stack: machineSteps up to `from` kg, then `step` above it. */
   machineChange?: Record<string, { from: number; step: number }>;
+  /** Machines that are the same as at the other gym (25 Nov 2026), so their weights carry straight across. */
+  sharedMachines?: string[];
 }
 
 const EPS = 1e-9;

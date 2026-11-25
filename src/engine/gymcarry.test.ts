@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carryAcrossGyms, Past } from '../plan';
+import { asThisGym, carryAcrossGyms, Past } from '../plan';
 const gym = (id: string) => ({ id, name: id, dumbbellStep: 2.5, smallestPlate: 1.25, kettlebells: [], machineSteps: { x: 2.5 } }) as never;
 const row = (date: string, gymId: string, sets: [number, number][]): Past => ({
   session: { id: date, date, gymId, week: 2 } as never,
@@ -37,5 +37,13 @@ describe('missed sessions around a travel day', () => {
     const slot = (idx: number, date: string) => ({ idx, week: 5, type: 'gymA', date, order: 1 }) as never;
     const out = catchUp([slot(1, '2026-11-20'), slot(2, '2026-11-21'), slot(3, '2026-11-23'), slot(4, '2026-11-24'), slot(5, '2026-11-25')], '2026-11-20', '2026-11-22', new Set(['2026-11-22']));
     expect((out as { date: string }[]).map(s => s.date)).toEqual(['2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27']);
+  });
+});
+
+describe('same machine at both gyms (25 Nov 2026)', () => {
+  it('every past session counts as this gym, so the last Adelaide weight is used as is', () => {
+    const out = asThisGym([row('10-16', 'fifo', [[20, 12]]), row('11-16', 'adelaide', [[27.5, 15]])], 'fifo');
+    expect(out.map(p => p.result.gymId)).toEqual(['fifo', 'fifo']);
+    expect(out.at(-1)!.result.weight).toBe(27.5);
   });
 });

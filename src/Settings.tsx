@@ -80,6 +80,11 @@ export function Settings({ state, sync }: { state: AppState; sync: SyncView }) {
                   <div className="row"><div className="grow"><div>{name(ex)}</div><div className="muted small">Weight step on this machine</div></div>
                     <Mini label={`${name(ex)} step`} value={`${step} kg`} onMinus={() => patch(x => { x.machineSteps[ex] = Math.max(0.5, round(step - 0.5, 0.5)); })} onPlus={() => patch(x => { x.machineSteps[ex] = round(step + 0.5, 0.5); })} />
                   </div>
+                  <label className="row small" style={{ gap: 8 }}>
+                    <input type="checkbox" aria-label={`${name(ex)} same at both gyms`} checked={!!g.sharedMachines?.includes(ex)}
+                      onChange={e => { const on = e.target.checked; patch(x => { const list = (x.sharedMachines ?? []).filter(m => m !== ex); x.sharedMachines = on ? [...list, ex] : list; }); }} />
+                    Same machine at both gyms (weights carry straight across)
+                  </label>
                   <div className="muted small">If the step changes higher up the stack, enter where and the new step. Leave both empty if it doesn't.</div>
                   <div className="grid2">
                     {(['from', 'step'] as const).map(k => (

@@ -131,6 +131,14 @@ export function pastFor(state: AppState, exId: string, before: SessionLog): Past
     .filter((x): x is Past => x !== null);
 }
 
+/** A machine Brad has marked as the same at both gyms (on either gym's settings). */
+export const sharedMachine = (state: AppState, ex: string) => state.profiles.some(p => p.sharedMachines?.includes(ex));
+
+/** Same machine at both gyms: every past session counts as if done at this gym. */
+export function asThisGym(past: Past[], gymId: string): Past[] {
+  return past.map(p => (p.session.gymId === gymId ? p : { ...p, session: { ...p.session, gymId }, result: { ...p.result, gymId } }));
+}
+
 /** Machines differ between gyms, so weights aren't copied across (23 Nov 2026). When the latest session of a machine
  *  lift was at the other gym, the weights last used at this gym go up by the percentage gained there since leaving
  *  (never down), and the session aims to match those reps rather than adding a step on top of the estimate. */
@@ -190,7 +198,7 @@ export function sidePlankAim(item: PlanItem, last: SetLog | undefined, fallbackR
 
 /** Most recent logged set for "last time" under the target. */
 export function lastSet(state: AppState, exId: string, setNo: number, side: string | undefined, session: SessionLog, perGym: boolean): SetLog | undefined {
-  const past = pastFor(state, exId, session).filter(p => !perGym || p.session.gymId === session.gymId);
+  const past = pastFor(state, exId, session).filter(p => !perGym || sharedMachine(state, exId) || p.session.gymId === session.gymId);
   return past.at(-1)?.sets.find(s => s.setNo === setNo && s.side === side && !s.rampUp && !s.extra);
 }
 
@@ -219,7 +227,9 @@ export function buildPlan(state: AppState, session: SessionLog): PlanItem[] {
     const ex = session.swaps[item.ex] ?? item.ex;
     const swapped = ex !== item.ex;
     const info = program.exercises[ex];
-    const past = carryAcrossGyms(pastFor(state, ex, session), state.profiles.find(p => p.id === session.gymId)!, ex, info.equip);
+    const past = info.equip === 'machine' && sharedMachine(state, ex)
+      ? asThisGym(pastFor(state, ex, session), session.gymId)
+      : carryAcrossGyms(pastFor(state, ex, session), state.profiles.find(p => p.id === session.gymId)!, ex, info.equip);
     // The deadlift follows the physio's graded return, so "felt very easy" never speeds it up.
     const graded = ex === 'deadlift' || ex === 'block_pull';
     const history = past.map(p => (graded ? { ...p.result, topRir: null } : p.result));
